@@ -1,0 +1,215 @@
+{
+  "meta": {
+    "file": "OFFEYEZ_v3_SEED.json",
+    "version": "3.0.0",
+    "status": "LOCKED",
+    "platform": "W//FORGE-SK",
+    "generated_at": "2026-08-04T20:51:00+07:00",
+    "authority": "W//FORGE ONE"
+  },
+  "character": {
+    "slug": "offeyez",
+    "name": "OFFEYEZ",
+    "version": "3.0.0",
+    "locked": true,
+    "drift_limit": 0.03,
+    "age": 20,
+    "height_cm": 175,
+    "weight_kg": 54,
+    "personality": "Confident · Elegant · Mysterious · Quiet",
+    "archetype": "Luxury Streetwear Devil",
+    "role": "Brand Ambassador · Digital Icon",
+    "dna_sha256": "0xF43C8BA1A9D2E7F5C4B8A3D1E9F6C2B5A8D4E7F1C3B5A9D2E6F8C1A4B7D3E5F9",
+    "dna": {
+      "face": "Sharp high cheekbone, almond eyes upward 8°, defined jawline, small refined nose, heart-shaped lip",
+      "hair": "Platinum silver twin tail, mid-back length, cool blue undertone, straight with soft end curl",
+      "signature": "Glossy red devil horns (symmetric pair), ruby tint visor 75%, gold geometric dangling earrings",
+      "body": "175cm · 54kg, slim athletic, long legs, elegant confident default stance",
+      "eyes": "Hazel iris, default: mysterious half-lidded, gaze slightly upward",
+      "skin": "Fair porcelain, clean, no tattoo, subtle natural blush",
+      "brand_base": "Matte black premium cotton top, black tactical cargo shorts, chunky platform sneakers"
+    },
+    "sheet": {
+      "voice": "Low warm tone, slow articulate, minimal words",
+      "brand_voice": "Premium dark · confident minimal · high contrast",
+      "keywords": [
+        "dark luxury",
+        "neon edge",
+        "quiet power",
+        "cyber elegance"
+      ],
+      "forbidden": [
+        "smile wide",
+        "overly cute pose",
+        "bright pastel color",
+        "messy hair"
+      ]
+    }
+  },
+  "libraries": {
+    "outfits": [
+      {
+        "id": "out_cyber_black_v1",
+        "name": "Cyberpunk Black Casual",
+        "version": "1.0",
+        "fragment": "matte black oversized tee, black tactical cargo shorts with utility straps, chunky black platform sneakers, black calf socks, small crossbody bag"
+      },
+      {
+        "id": "out_lux_red_v1",
+        "name": "Luxury Crimson Accent",
+        "version": "1.0",
+        "fragment": "tailored black cropped blazer, crimson silk camisole, high-waist tailored trousers, pointed stiletto boots, gold chain details"
+      }
+    ],
+    "poses": [
+      {
+        "id": "pose_conf_01",
+        "name": "Confident Standing",
+        "fragment": "standing, weight on right leg, left leg relaxed forward, head tilted back 15°, right hand in shorts pocket"
+      },
+      {
+        "id": "pose_walk_01",
+        "name": "Mid-Stride Elegant",
+        "fragment": "mid-stride walking forward, left foot front, body slightly turned, hair motion blur subtle"
+      }
+    ],
+    "expressions": [
+      {
+        "id": "exp_myst_v1",
+        "name": "Mysterious Default",
+        "fragment": "half-lidded eyes, neutral lip, subtle head tilt"
+      },
+      {
+        "id": "exp_conf_v1",
+        "name": "Confident Smirk",
+        "fragment": "one corner lip up, sharp direct eye contact"
+      }
+    ],
+    "materials": [
+      {
+        "id": "mat_horn_v1",
+        "name": "Glossy Devil Horns",
+        "fragment": "horns: glossy deep candy red, subsurface scattering, hard specular highlight, no scratches"
+      },
+      {
+        "id": "mat_visor_v1",
+        "name": "Ruby Visor",
+        "fragment": "visor: 75% ruby red tint, full mirror reflection of neon street, seamless frame"
+      }
+    ]
+  },
+  "prompt_build_v14": {
+    "version": 14,
+    "label": "NINJAXO S03 · Final Master",
+    "modules_ordered": [
+      {
+        "id": "identity",
+        "locked": true,
+        "weight": 40,
+        "value": "OFFEYEZ, 20yo female, platinum silver twin tail, glossy red devil horns, ruby visor, gold geometric earrings, elegant mysterious expression — DNA LOCKED, DO NOT ALTER"
+      },
+      {
+        "id": "camera",
+        "locked": false,
+        "weight": 12,
+        "value": "ARRI Alexa Mini, 35mm prime, f/1.8, slight low angle, cinematic wide shot, eye level +10%"
+      },
+      {
+        "id": "pose",
+        "locked": false,
+        "weight": 10,
+        "value": "standing confident, weight on one leg, head tilted back 15°, one hand in pocket, body language: elegant + dangerous"
+      },
+      {
+        "id": "lighting",
+        "locked": false,
+        "weight": 10,
+        "value": "3-point neon lighting: key = crimson neon left, rim = cyan backlight, fill = soft white 20%, wet street reflections, volumetric fog 15%"
+      },
+      {
+        "id": "scene",
+        "locked": false,
+        "weight": 10,
+        "value": "rainy Neo-Tokyo back alley at night, wet asphalt reflections, neon signs bokeh background, cinematic atmosphere, ultra detailed"
+      },
+      {
+        "id": "material",
+        "locked": false,
+        "weight": 6,
+        "value": "matte black premium cotton t-shirt, heavy cargo shorts tactical straps, chunky platform sneakers, polished horn material, visor red tint reflection"
+      },
+      {
+        "id": "typography",
+        "locked": false,
+        "weight": 4,
+        "value": "NO TEXT OVERLAY — brand safe for post, no embedded typography in render"
+      },
+      {
+        "id": "render",
+        "locked": false,
+        "weight": 8,
+        "value": "Seedream 5.0 Pro, photorealism, 8K, ultra sharp details, subsurface scattering, film grain 3.5%, color grade: teal & crimson"
+      }
+    ],
+    "negative": [
+      "identity drift",
+      "face drift",
+      "deformed anatomy",
+      "extra limbs",
+      "bad hands",
+      "extra fingers",
+      "inconsistent horns",
+      "wrong hair color",
+      "text overlay",
+      "watermark",
+      "logo burn-in",
+      "low quality",
+      "blurry",
+      "overexposed",
+      "underexposed",
+      "cropped horns",
+      "cropped visor"
+    ],
+    "params": {
+      "cfg": 7.5,
+      "steps": 32,
+      "sampler": "DPM++ 2M Karras",
+      "width": 1024,
+      "height": 1536,
+      "seed": -1,
+      "controlnet": [
+        "openpose_full",
+        "ip_adapter_identity_strong",
+        "depth_midas"
+      ],
+      "model": "Seedream 5.0 Pro"
+    },
+    "positive_final": "OFFEYEZ, 20yo female, platinum silver twin tail, glossy red devil horns, ruby visor, gold geometric earrings, elegant mysterious expression — DNA LOCKED, DO NOT ALTER. ARRI Alexa Mini 35mm f/1.8 slight low angle cinematic wide, standing confident head back 15deg one hand in pocket, 3pt neon crimson key L cyan rim back, rainy Neo-Tokyo alley night wet reflections, matte black premium cotton t-shirt cargo shorts, Seedream 5 Pro photorealism 8K film grain 3.5%.",
+    "build_hash": "0xA79F3C2B8D4E6F1A5C3B7D9E2F4A8C6B1D3E5F7A9C2B4D6E8F1A3C5B7D9E2F4"
+  },
+  "bapg_bundle": {
+    "id": "bun_njxo_014_v14",
+    "project": "NINJAXO_S03_OFFEYEZ",
+    "authorized_by": [
+      "BANK · Owner",
+      "SERREZ · AI Guardian"
+    ],
+    "authorized_at": "2026-08-04T20:30:00+07:00",
+    "immutable": true,
+    "contains": [
+      "character_snapshot",
+      "prompt_build_v14",
+      "negative",
+      "params",
+      "all_libraries"
+    ],
+    "bundle_sha256": "0xDEADBEEF8C6B1D3E5F7A9C2B4D6E8F1A3C5B7D9E2F4A8C6B1D3E5F7A9C2B4D6E"
+  },
+  "qc_baseline": {
+    "identity_min": 97,
+    "face_min": 96,
+    "anatomy_min": 90,
+    "auto_approve_overall": 90,
+    "hard_reject_below": 80
+  }
+}
