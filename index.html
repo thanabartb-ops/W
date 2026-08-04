@@ -1,0 +1,494 @@
+<html lang="th" style="margin:0;padding:0;">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BANK- CONTOUR</title></head>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+(function(){
+  var s = document.createElement('style');
+  s.textContent = `
+    :root{
+      --bg:#05050a;--panel:rgba(16,16,30,.72);--line:rgba(139,92,246,.22);
+      --text:#e6e4ff;--muted:#7e7ba8;
+      --v:#8b5cf6;--c:#06b6d4;--p:#ec4899;--g:#10b981;--a:#f59e0b;--r:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{background:var(--bg);color:var(--text);font-family:'Sora',sans-serif;margin:0}
+    .mono{font-family:'Chakra Petch',monospace;letter-spacing:.02em}
+    .glass{background:linear-gradient(140deg,rgba(22,22,42,.8),rgba(10,10,18,.65));backdrop-filter:blur(14px);border:1px solid var(--line)}
+    .metal{background:linear-gradient(155deg,#151525 0%,#0b0b16 50%,#121222 100%);border:1px solid rgba(255,255,255,.05);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .grid-bg{background-image:linear-gradient(rgba(139,92,246,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(139,92,246,.05) 1px,transparent 1px);background-size:32px 32px}
+    .rgb{background:linear-gradient(90deg,#8b5cf6,#06b6d4 35%,#10b981 55%,#f59e0b 75%,#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% 100%;animation:rgb 8s linear infinite}
+    @keyframes rgb{0%{background-position:0}100%{background-position:200%}}
+    .neon{position:relative}
+    .neon::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(135deg,#8b5cf6,#06b6d4 40%,#ec4899 75%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+    .toc{cursor:pointer;transition:all .2s;border-left:2px solid transparent}
+    .toc:hover{background:rgba(139,92,246,.08);color:#fff}
+    .toc.active{border-left-color:var(--c);background:linear-gradient(90deg,rgba(6,182,212,.12),transparent);color:#fff}
+    .chip{padding:2px 9px;border-radius:999px;font-size:10px;font-weight:600}
+    .sec{scroll-margin-top:80px}
+    .tbl{width:100%;border-collapse:collapse;font-size:12px}
+    .tbl th,.tbl td{padding:7px 9px;text-align:left;border-bottom:1px solid var(--line)}
+    .tbl th{background:rgba(139,92,246,.08);color:#c4b5fd;font-weight:600;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+    .tbl tr:hover td{background:rgba(6,182,212,.05)}
+    .k{color:var(--c)}.v{color:var(--p)}.g{color:var(--g)}.a{color:var(--a)}
+    .code{background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:'Chakra Petch',monospace;font-size:11.5px;line-height:1.65;overflow-x:auto;color:#d6d3ff}
+    .bar{height:5px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}
+    .lock{background:rgba(16,185,129,.14);color:#6ee7b7;border:1px solid rgba(16,185,129,.35)}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-thumb{background:rgba(139,92,246,.3);border-radius:999px}
+  `;
+  document.head.appendChild(s);
+})();
+</script>
+<div style="background-color:transparent;box-sizing:border-box;">
+<div class="min-h-screen grid-bg" style="background:radial-gradient(900px 500px at 10% -10%,rgba(236,72,153,.18),transparent 60%),radial-gradient(700px 400px at 100% 0%,rgba(6,182,212,.18),transparent 55%),var(--bg)">
+
+  <!-- HEADER -->
+  <div class="glass border-b sticky top-0 z-50" style="border-color:var(--line)">
+    <div class="max-w-7xl mx-auto px-5 py-3 flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg neon flex items-center justify-center metal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ec4899"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><path d="M4 20V4l8 10V4l8 16V8" stroke="url(#g)" stroke-width="2.2"/></svg>
+        </div>
+        <div>
+          <div class="mono text-[10px] tracking-[.3em] text-white/50">CORE SPEC · COMBINED</div>
+          <div class="text-sm font-bold"><span class="rgb">W//FORGE-SK-Character + PromptEngine.md</span></div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="chip metal">v0.1.0</span>
+        <span class="chip" style="background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.35)">DESIGN</span>
+        <span class="chip lock">🔒 ONE SOURCE · NO SPLIT</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-5 py-6 grid grid-cols-12 gap-5">
+
+    <!-- TOC -->
+    <aside class="col-span-12 lg:col-span-3">
+      <div class="glass rounded-2xl p-3 lg:sticky lg:top-24">
+        <div class="mono text-[10px] tracking-[.3em] text-white/50 px-2 pb-2">// CONTENTS</div>
+        <div class="space-y-0.5 text-sm" id="toc"></div>
+      </div>
+    </aside>
+
+    <!-- CONTENT -->
+    <main class="col-span-12 lg:col-span-9 space-y-5">
+
+      <!-- HERO -->
+      <section id="top" class="sec glass rounded-2xl p-6 neon relative overflow-hidden">
+        <div class="absolute -top-20 right-0 w-80 h-80 rounded-full" style="background:conic-gradient(from 0deg,#ec4899,#06b6d4,#10b981,#8b5cf6,#ec4899);filter:blur(60px);opacity:.22"></div>
+        <div class="relative">
+          <div class="mono text-xs tracking-[.3em]" style="color:var(--p)">// HEART OF W//FORGE · COMBINED SINGLE FILE</div>
+          <h1 class="text-3xl md:text-4xl font-bold mt-1 leading-tight">
+            <span class="rgb">Character Identity System</span><br/>
+            <span class="text-white/90">+ Modular Prompt Engine</span>
+          </h1>
+          <p class="mt-3 text-white/70 max-w-3xl leading-relaxed">
+            ระบบคู่หัวใจของ W//FORGE: <strong>Character DNA</strong> เป็นตัวตนที่ <span class="text-emerald-400 font-semibold">LOCK</span> ไว้ตลอด Pipeline
+            และ <strong>Prompt Engine</strong> ที่ประกอบโมดูลได้โดย <span class="text-emerald-400 font-semibold">ไม่กระทบ Identity</span>
+            ทั้งสองระบบทำงานคู่กันภายใต้ <strong>One Source of Truth</strong> — ไม่แยกไฟล์ ไม่หลุดข้อมูล
+          </p>
+          <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
+            <div class="metal rounded-lg p-2.5"><div class="mono text-[9px] text-white/50">DNA AXES</div><div class="text-lg font-bold" style="color:var(--p)">7</div></div>
+            <div class="metal rounded-lg p-2.5"><div class="mono text-[9px] text-white/50">PROMPT MODULES</div><div class="text-lg font-bold" style="color:var(--c)">8</div></div>
+            <div class="metal rounded-lg p-2.5"><div class="mono text-[9px] text-white/50">PIPELINE</div><div class="text-lg font-bold" style="color:var(--a)">9</div></div>
+            <div class="metal rounded-lg p-2.5"><div class="mono text-[9px] text-white/50">DRIFT LIMIT</div><div class="text-lg font-bold g">≤ 3%</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ PART 1: CHARACTER ============ -->
+      <section id="char-overview" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--p)">// PART 1 · CHARACTER SYSTEM</div>
+        <h2 class="text-2xl font-bold mt-1 mb-1"><span style="color:var(--p)">W//FORGE-SK-Character</span></h2>
+        <p class="text-sm text-white/60 mb-4">เจ้าของตัวตนเดียวของระบบ · ทุกอย่างอ้างอิงจากที่นี่</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div class="metal rounded-xl p-4">
+            <div class="mono text-[10px] tracking-[.2em] mb-2" style="color:var(--p)">PRINCIPLES</div>
+            <div class="space-y-1">
+              <div>✦ <strong>One Identity</strong> — ตัวละครหนึ่ง มี DNA เดียวตลอดชีวิต</div>
+              <div>✦ <strong>Immutable When Locked</strong> — Lock แล้วห้ามแก้ไข โดยไม่ Bump Version</div>
+              <div>✦ <strong>Every Render References</strong> — ทุก Prompt อ้าง DNA ID เสมอ</div>
+              <div>✦ <strong>Drift ≤ 3%</strong> — เกินค่า QC แล้ว Auto Reject</div>
+              <div>✦ <strong>OFFEYEZ = Standard v1</strong> — ตัวอย่างมาตรฐานของระบบ</div>
+            </div>
+          </div>
+          <div class="metal rounded-xl p-4">
+            <div class="mono text-[10px] tracking-[.2em] mb-2" style="color:var(--p)">7 LIBRARIES PER CHARACTER</div>
+            <div class="grid grid-cols-2 gap-1.5">
+              ${['Character DNA','Character Sheet','Outfit','Pose','Expression','Material','Version History'].map((x,i)=>`<div class="glass rounded-md px-2 py-1.5 flex items-center gap-1.5"><span class="mono text-[10px]" style="color:var(--p)">0${i+1}</span>${x}</div>`).join('')}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DNA SCHEMA -->
+      <section id="char-dna" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--p)">// 1.1 · IDENTITY DNA SCHEMA</div>
+        <h3 class="text-xl font-bold mt-1 mb-3">7 Core Axes · LOCKED = ห้าม Modular Prompt แตะ</h3>
+        <table class="tbl">
+          <thead><tr><th>AXIS</th><th>DESCRIPTION</th><th>LOCK</th><th>WEIGHT IN PROMPT</th><th>EXAMPLE · OFFEYEZ</th></tr></thead>
+          <tbody>
+            ${[
+              ['Face Structure','โครงหน้า · ความสัมพันธ์ 5 ส่วน','🔒 MANDATORY','40%','Sharp · High cheekbone · Almond eyes upward 8°'],
+              ['Hair','สี · ทรง · ความยาว · Texture','🔒 ON','15%','Platinum silver · Twin tail · Mid-back length'],
+              ['Signature Mark','อุปกรณ์ประจำตัว · ต้องมีเสมอ','🔒 ON','12%','Glossy red devil horns (2) · Ruby visor'],
+              ['Body / Silhouette','ส่วนสูง · สัดส่วน · ท่าทางฐาน','🔒 ON','10%','175cm · 54kg · Elegant confident stance'],
+              ['Eyes / Expression','รูปตา · ลุคน้ำตา · ฐานอารมณ์','⚙ OPT','8%','Hazel · Default: mysterious / confident'],
+              ['Skin Tone & Detail','สีผิว · ลายสัก · รอย','⚙ OPT','7%','Fair · Clean · No tattoo'],
+              ['Brand / Costume Base','ชุดฐานของ Brand · ห้ามเปลี่ยน','🔒 ON','8%','Matte black top · Gold geometric earrings'],
+            ].map(r=>`<tr><td class="mono font-semibold" style="color:var(--p)">${r[0]}</td><td>${r[1]}</td><td class="text-center"><span class="chip ${r[2].includes('🔒')?'lock':'metal'}">${r[2]}</span></td><td class="mono text-center a">${r[3]}</td><td class="text-[11px] text-white/75">${r[4]}</td></tr>`).join('')}
+          </tbody>
+        </table>
+
+        <div class="mt-4">
+          <div class="mono text-[10px] tracking-[.2em] mb-1.5" style="color:var(--p)">DNA LOCK CONTRACT</div>
+          <div class="code">
+<span class="k">CHARACTER_DNA</span> = {
+  <span class="v">id</span>:          <span class="g">"char_offeyez_v3"</span>,    <span class="a">// ← ทุก Prompt จะอ้างค่านี้เสมอ</span>
+  <span class="v">name</span>:        <span class="g">"OFFEYEZ"</span>,
+  <span class="v">version</span>:     <span class="g">"3.0.0"</span>,
+  <span class="v">locked</span>:      <span class="g">true</span>,                  <span class="a">// false = ยังแก้ไขได้ · QC จะไม่ผ่านถ้า false</span>
+  <span class="v">drift_limit</span>: <span class="g">0.03</span>,                  <span class="a">// 3% · เกินค่านี้ Reject อัตโนมัติ</span>
+  <span class="v">axes</span>: { <span class="a">/* 7 Axes ด้านบน */</span> },
+  <span class="v">prompt_fragment</span>: <span class="g">"OFFEYEZ, 20yo female, platinum silver twin tail, glossy red devil horns, ruby visor, gold geometric earrings, elegant mysterious expression — DNA LOCKED, DO NOT ALTER"</span>,
+  <span class="v">sha256</span>:      <span class="g">"0xF43C8BA1..."</span>        <span class="a">// hash ของ DNA · เปลี่ยน = Hash เปลี่ยน = Version++</span>
+}
+          </div>
+        </div>
+      </section>
+
+      <!-- CHARACTER SHEET + LIBS -->
+      <section id="char-libs" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--p)">// 1.2 · SHEET & 6 LIBRARIES</div>
+        <h3 class="text-xl font-bold mt-1 mb-3">Character Sheet + Library Structure</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          ${[
+            ['📋 Character Sheet','ข้อมูลเต็ม: Name, Age, Height, Weight, Role, Personality, Brand Voice, Archetype · อ้างอิงโดย QC'],
+            ['👕 Outfit Library','แต่ละ Outfit = ID + ชื่อ + Prompt Fragment + Hash + Version · e.g. Cyberpunk Casual, Luxury Black, Streetwear'],
+            ['🕺 Pose Library','ท่าทาง: Full / Mid / Close-up + Body Language + Camera Relation · e.g. "Weight on one leg, head back 15°"'],
+            ['😶 Expression Library','6 ฐาน + N Variants: Neutral / Confident / Elegant / Mysterious / Fierce / Playful · ทุกอันมี Reference Image'],
+            ['✨ Material Library','วัสดุที่ใช้ซ้ำ: Horns (glossy deep red), Visor (ruby tint 75%), Hair (silver with cool blue undertone), Fabric (matte black premium cotton)'],
+            ['📜 Version History','Immutable Log: ทุกการแก้ DNA / Sheet / Outfit = bump version + changelog + who changed + reason + new hash · ไม่สามารถลบได้'],
+          ].map(([t,d])=>`<div class="metal rounded-xl p-3"><div class="font-semibold mb-1" style="color:var(--p)">${t}</div><div class="text-white/70 leading-snug">${d}</div></div>`).join('')}
+        </div>
+      </section>
+
+      <!-- LOCK MECHANISM -->
+      <section id="char-lock" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--p)">// 1.3 · IDENTITY LOCK MECHANISM</div>
+        <h3 class="text-xl font-bold mt-1 mb-3">วิธีการ Lock · Unlock · Drift Protection</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div class="metal rounded-xl p-3 border" style="border-color:rgba(16,185,129,.35)"><div class="font-bold g mb-1">🔒 LOCK</div>
+            <div>1. Owner / BAPG Authorize<br/>2. Freeze DNA + 7 Libraries<br/>3. Generate SHA-256<br/>4. Mark <span class="mono">locked=true</span><br/>5. Pipeline จะใช้เฉพาะนี้ต่อไป</div></div>
+          <div class="metal rounded-xl p-3 border" style="border-color:rgba(245,158,11,.35)"><div class="font-bold a mb-1">🔓 UNLOCK (RARE)</div>
+            <div>1. Request Reason<br/>2. Owner + AI Guardian (SERREZ) approve<br/>3. Bump Major Version (x.0.0)<br/>4. Re-Lock + New Hash<br/>5. Old Render อ้างเก่า · ใหม่อ้างใหม่</div></div>
+          <div class="metal rounded-xl p-3 border" style="border-color:rgba(236,72,153,.35)"><div class="font-bold" style="color:var(--p)">🛡 DRIFT PROTECTION</div>
+            <div>ทุก Render → QC วัด Identity Similarity กับ DNA Reference Set<br/>• < 3% → PASS<br/>• 3–5% → WARNING + Delta Refine<br/>• > 5% → AUTO-REJECT + Log</div></div>
+        </div>
+      </section>
+
+      <!-- ============ PART 2: PROMPT ENGINE ============ -->
+      <section id="pe-overview" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--c)">// PART 2 · PROMPT ENGINE</div>
+        <h2 class="text-2xl font-bold mt-1 mb-1"><span style="color:var(--c)">W//FORGE-SK-PromptEngine</span></h2>
+        <p class="text-sm text-white/60 mb-4">Modular Prompt Builder · รับประกันว่า <strong class="g">Identity Module จะไม่ถูกแก้ไข / สลับทิศทางโดยโมดูลอื่น</strong></p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div class="metal rounded-xl p-4">
+            <div class="mono text-[10px] tracking-[.2em] mb-2" style="color:var(--c)">RULES · NON-NEGOTIABLE</div>
+            <div class="space-y-1">
+              <div>✦ <strong>Module = อิสระ</strong> — เปลี่ยน Camera ไม่กระทบ Identity</div>
+              <div>✦ <strong>Order = Weight</strong> — โมดูลที่อยู่บน = น้ำหนักมากกว่า</div>
+              <div>✦ <strong>Identity = Always #1 + LOCKED</strong> — ไม่สามารถลด Priority ได้</div>
+              <div>✦ <strong>ทุก Build = Hash + Version</strong> — เปลี่ยนอะไรก็ตาม = บันทึก Diff</div>
+              <div>✦ <strong>Negative = Global Module</strong> — แยกออกมา ไม่ปนกับ Positive</div>
+            </div>
+          </div>
+          <div class="metal rounded-xl p-4">
+            <div class="mono text-[10px] tracking-[.2em] mb-2" style="color:var(--c)">9-STEP BUILD PIPELINE</div>
+            <div class="flex flex-wrap gap-1 items-center">
+              ${['Brief','Ref','Style','Build','Approve','BAPG','Render','QC','Export'].map((s,i)=>`<span class="mono text-[10px] px-1.5 py-0.5 rounded" style="background:rgba(6,182,212,.15);color:#67e8f9;border:1px solid rgba(6,182,212,.35)">${i+1}.${s}</span>${i<8?'<span class="text-white/30">→</span>':''}`).join('')}
+            </div>
+            <div class="mt-2 text-white/60">Prompt Engine เป็นเจ้าของ Step 4 · แต่ส่งต่อ / รับผลกลับมาทุก Step</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8 MODULES -->
+      <section id="pe-modules" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--c)">// 2.1 · 8 MODULES · FIXED ORDER · WEIGHTED</div>
+        <h3 class="text-xl font-bold mt-1 mb-3">ลำดับที่ 1 = สำคัญที่สุด · ห้ามย้ายลำดับ 01</h3>
+        <table class="tbl">
+          <thead><tr><th>#</th><th>MODULE</th><th>RESPONSIBILITY</th><th>LOCK</th><th>WEIGHT</th><th>EXAMPLE FRAGMENT</th></tr></thead>
+          <tbody>
+            ${[
+              ['01','IDENTITY','DNA Fragment · OFFEYEZ Description','🔒 ALWAYS','40%','OFFEYEZ, 20yo female, silver twin tail... — DNA LOCKED, DO NOT ALTER'],
+              ['02','CAMERA','Lens · Focal · Angle · DOF · Film Back','⚙','12%','ARRI Alexa, 35mm, f/1.8, slight low angle, cinematic wide'],
+              ['03','POSE','Body language · Hand · Head tilt · Weight','⚙','10%','Standing confident, head back 15°, one hand in pocket'],
+              ['04','LIGHTING','3-point setup · Color · Intensity · Rim','⚙','10%','3pt neon: crimson key L, cyan rim back, soft fill 20%'],
+              ['05','SCENE','Environment · Time · Weather · Atmosphere','⚙','10%','Rainy Neo-Tokyo alley at night, wet asphalt reflections'],
+              ['06','MATERIAL','Override / Enhance material library','⚙','6%','Horns glossy deep red, visor 75% ruby tint reflection'],
+              ['07','TYPOGRAPHY','Text-safe / No-text / Overlay spec','⚙','4%','NO TEXT OVERLAY — brand safe, no embedded typography'],
+              ['08','RENDER','Engine · Sampler · Steps · CFG · Style','⚙','8%','Seedream 5.0 Pro, photorealism, 8K, film grain 3.5%'],
+            ].map(r=>`<tr><td class="mono font-bold text-center" style="color:${r[0]==='01'?'var(--p)':'var(--c)'}">${r[0]}</td><td class="mono font-semibold">${r[1]}</td><td>${r[2]}</td><td class="text-center"><span class="chip ${r[3].includes('🔒')?'lock':'metal'}">${r[3]}</span></td><td class="mono text-center a">${r[4]}</td><td class="text-[11px] text-white/70">${r[5]}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <div class="mt-3 text-[11px] text-white/55">
+          <strong class="text-white">น้ำหนักรวม 100%</strong> — Engine จะแปลง Weight → Token Multiplier ใน Prompt
+          (โมดูล 40% = ซ้ำในตำแหน่ง Front + Mid + Weight Boost)
+        </div>
+      </section>
+
+      <!-- BUILD LOGIC -->
+      <section id="pe-build" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--c)">// 2.2 · BUILD LOGIC · ASSEMBLER</div>
+        <h3 class="text-xl font-bold mt-1 mb-3">วิธี Engine รวมโมดูล → Prompt สุดท้าย + Hash</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="code">
+<span class="k">FUNCTION</span> buildPrompt(characterId, modules, negative, params) {
+  <span class="a">// 1. ดึง DNA ตาม ID · ตรวจ Lock + Hash</span>
+  <span class="k">const</span> dna = <span class="k">await</span> Character.getLocked(characterId);
+  <span class="k">if</span> (!dna.locked) <span class="k">throw</span> <span class="g">"DNA_NOT_LOCKED"</span>;
+
+  <span class="a">// 2. เรียงโมดูลตามลำดับมาตรฐาน · 01 = IDENTITY เสมอ</span>
+  <span class="k">const</span> ordered = [
+    { id:<span class="g">'identity'</span>, text:dna.prompt_fragment, locked:<span class="g">true</span>, weight:dna.weight },
+    ...modules.sort((a,b)=>ORDER[a.id]-ORDER[b.id])
+  ];
+
+  <span class="a">// 3. ตัดโมดูลที่ขัดแย้งกับ DNA (Drift Guard)</span>
+  ordered.forEach(m => DriftGuard.validate(m, dna));
+
+  <span class="a">// 4. ประกอบ = น้ำหนักแปรเป็น Position + Repetition</span>
+  <span class="k">const</span> positive = WeightedAssembler.run(ordered);
+  <span class="k">const</span> negative = NegativeAssembler.run(negative);
+
+  <span class="a">// 5. Generate Hash + Version · เก็บเป็นประวัติ</span>
+  <span class="k">const</span> hash = sha256(positive + <span class="g">"|"</span> + negative + dna.sha256);
+  PromptVersion.create({ characterId, modules, hash, params });
+
+  <span class="k">return</span> { positive, negative, hash, dnaVersion:dna.version };
+}
+          </div>
+          <div class="space-y-3 text-xs">
+            <div class="metal rounded-xl p-3">
+              <div class="mono text-[10px] tracking-[.2em] mb-1" style="color:var(--c)">DRIFT GUARD (AUTOMATIC)</div>
+              <div>ถ้าโมดูลใดพยายามเปลี่ยน:
+                <br/>• สีผม ≠ DNA → <span class="text-red-400">BLOCK + Warning</span>
+                <br/>• ไม่มี Horns ใน Scene → <span class="text-amber-300">WARN + Inject Back</span>
+                <br/>• เปลี่ยนสีตาโดยไม่มี Expression ID → <span class="text-red-400">BLOCK</span>
+                <br/>• Camera ใกล้เกินไปจน Face Structure เสีย → <span class="text-amber-300">WARN</span>
+              </div>
+            </div>
+            <div class="metal rounded-xl p-3">
+              <div class="mono text-[10px] tracking-[.2em] mb-1" style="color:var(--c)">OUTPUT SPEC · BUILD v14 OFFEYEZ</div>
+              <div class="text-[11px] leading-relaxed text-white/80">
+                <strong>POS:</strong> OFFEYEZ, 20yo female, silver twin tail, glossy red horns, ruby visor, elegant mysterious — DNA LOCKED — ARRI Alexa 35mm f/1.8, slight low angle, confident standing head back 15°, 3pt neon crimson+cyan, rainy Neo-Tokyo wet reflections, horns glossy red, visor ruby tint, NO TEXT, Seedream 5 Pro, 8K, film grain 3.5%
+                <br/><br/><strong>NEG:</strong> identity drift, face drift, deformed anatomy, extra limbs, bad hands, wrong hair color, text overlay, watermark, blurry
+                <br/><br/><strong class="mono">HASH:</strong> <span class="g">0xA7·9F·3C…</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- NEGATIVE + PARAMS -->
+      <section id="pe-neg" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--c)">// 2.3 · NEGATIVE MODULE + RENDER PARAMS</div>
+        <h3 class="text-xl font-bold mt-1 mb-3">ส่วนเสริมทุก Build · แยกจาก Positive</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div class="metal rounded-xl p-3">
+            <div class="font-bold mb-1" style="color:var(--c)">🧨 NEGATIVE (GLOBAL + PER-CHAR)</div>
+            <div class="grid grid-cols-2 gap-1.5 mt-2">
+              ${['Identity drift','Face drift','Bad anatomy','Extra limbs','Bad hands','Wrong hair','Text overlay','Watermark','Blurry','Overexposed','Logo burn-in','Low quality'].map(x=>`<div class="glass rounded-md px-2 py-1 text-[11px]">✕ ${x}</div>`).join('')}
+            </div>
+            <div class="mt-2 text-[11px] text-white/55">สามารถเพิ่ม Per-Project · แต่ Base จะถูก Inject เสมอ</div>
+          </div>
+          <div class="metal rounded-xl p-3">
+            <div class="font-bold mb-1" style="color:var(--c)">⚙ RENDER PARAMS (PER BUILD)</div>
+            <div class="space-y-1 mt-2">
+              ${[['CFG Scale','7.5'],['Sampler','DPM++ 2M Karras'],['Steps','32'],['Resolution','1024×1536'],['Seed','Per-job · Lockable'],['Model','Seedream 5.0 Pro'],['ControlNet','OpenPose + Identity IP-Adapter']].map(([k,v])=>`<div class="flex justify-between glass rounded-md px-2 py-1"><span>${k}</span><span class="mono a">${v}</span></div>`).join('')}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ PART 3: INTEGRATION ============ -->
+      <section id="integration" class="sec glass rounded-2xl p-6 neon">
+        <div class="mono text-xs tracking-[.3em] rgb">// PART 3 · INTEGRATION LAYER · ONE SOURCE</div>
+        <h3 class="text-xl font-bold mt-1 mb-3">วิธี Character + Prompt Engine คุยกัน · ไม่หลุด · ไม่ขัดแย้ง</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div class="metal rounded-xl p-3 border" style="border-color:rgba(236,72,153,.35)">
+            <div class="font-bold mb-1" style="color:var(--p)">🔗 REFERENCE CONTRACT</div>
+            <div>ทุก Prompt Build <strong>ต้องมี</strong> <span class="mono">characterId + version + hash</span>
+              <br/>→ Render Job จะไม่รันถ้าไม่มี
+              <br/>→ QC จะเปรียบเทียบกับ DNA ตรงนี้
+              <br/>→ Archive จะเก็บเป็น Immutable Bundle</div>
+          </div>
+          <div class="metal rounded-xl p-3 border" style="border-color:rgba(6,182,212,.35)">
+            <div class="font-bold mb-1" style="color:var(--c)">🛡 DRIFT FEEDBACK LOOP</div>
+            <div>QC พบ Drift → ส่งกลับมา Engine
+              <br/>1. Auto ปรับ Module ที่ทำให้ Drift
+              <br/>2. แจ้ง Owner ถ้า > 3%
+              <br/>3. เก็บ Diff เป็น Knowledge → ป้องกันครั้งหน้า
+              <br/>4. SERREZ (AI Guardian) ตัดสินใจสุดท้าย</div>
+          </div>
+          <div class="metal rounded-xl p-3 border" style="border-color:rgba(16,185,129,.35)">
+            <div class="font-bold g mb-1">📦 IMMUTABLE BUNDLE</div>
+            <div>ตอน BAPG Authorization ระบบจะสร้าง Bundle:
+              <br/>• DNA Snapshot
+              <br/>• Prompt Build (8 Modules + Negative + Params)
+              <br/>• SHA-256 รวม
+              <br/>→ ใช้นี้ Render ทุก Job · เปลี่ยนอะไร = Bundle ใหม่</div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <div class="mono text-[10px] tracking-[.2em] mb-1.5">BUNDLE STRUCTURE · BAPG LOCKED</div>
+          <div class="code">
+<span class="k">PRODUCTION_BUNDLE</span> = {
+  <span class="v">id</span>:          <span class="g">"bun_njxo_014_v14"</span>,
+  <span class="v">project</span>:     <span class="g">"NINJAXO_S03"</span>,
+  <span class="v">character</span>:   { id, version, hash, dna_snapshot },
+  <span class="v">prompt</span>:      { modules, positive, negative, params, hash },
+  <span class="v">authorized_by</span>: <span class="g">"BANK + SERREZ"</span>,
+  <span class="v">authorized_at</span>: <span class="g">"2026-08-04T20:21:57+07:00"</span>,
+  <span class="v">immutable</span>:   <span class="g">true</span>,        <span class="a">// BAPG ผ่านแล้ว ห้ามแก้</span>
+  <span class="v">bundle_hash</span>: <span class="g">"0xDEADBEEF…"</span>  <span class="a">// SHA-256 ของทั้งหมด</span>
+}
+          </div>
+        </div>
+      </section>
+
+      <!-- DB + API -->
+      <section id="db-api" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--v)">// PART 4 · DB & API · IMPLEMENTATION</div>
+        <h3 class="text-xl font-bold mt-1 mb-3">Tables + Endpoints เฉพาะ 2 ระบบนี้</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div>
+            <div class="mono text-[10px] tracking-[.2em] mb-2" style="color:var(--p)">POSTGRESQL TABLES</div>
+            <table class="tbl">
+              <thead><tr><th>TABLE</th><th>MAIN FIELDS</th></tr></thead>
+              <tbody>
+                ${[
+                  ['characters','id, slug, name, version, locked, drift_limit, dna_json, sheet_json, base_hash, created_by, locked_at, locked_by'],
+                  ['char_libraries','id, char_id, type(outfit/pose/expr/material), name, fragment, ref_asset_id, version, hash'],
+                  ['char_versions','id, char_id, version, diff_json, prev_hash, new_hash, changed_by, reason, created_at'],
+                  ['prompts','id, char_id, char_version, char_hash, modules_json, positive, negative, params_json, hash, version, created_by'],
+                  ['prompt_versions','id, prompt_id, version, diff_json, prev_hash, new_hash'],
+                  ['bundles','id, project_id, char_id, prompt_id, char_snapshot, prompt_snapshot, authorized_by, authorized_at, bundle_hash, immutable'],
+                ].map(r=>`<tr><td class="mono font-semibold" style="color:var(--p)">${r[0]}</td><td class="text-[11px] text-white/75">${r[1]}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div class="mono text-[10px] tracking-[.2em] mb-2" style="color:var(--c)">API ENDPOINTS</div>
+            <table class="tbl">
+              <thead><tr><th>METHOD</th><th>PATH</th><th>DO</th></tr></thead>
+              <tbody>
+                ${[
+                  ['POST','/api/characters','สร้างตัวละครใหม่'],
+                  ['POST','/api/characters/:id/lock','🔒 Lock + Bump Version + Hash'],
+                  ['GET','/api/characters/:id/dna','อ่าน DNA (ใช้ใน Prompt Engine)'],
+                  ['GET','/api/characters/:id/library/:type','ดึง Library ตามประเภท'],
+                  ['POST','/api/prompts/build','→ เรียก buildPrompt() · รับ modules → คืน prompt+hash'],
+                  ['POST','/api/prompts/:id/validate-drift','ถาม Drift Guard ว่าโมดูลนี้โอไหม'],
+                  ['POST','/api/prompts/:id/versions','เก็บ Version ใหม่ + Diff'],
+                  ['POST','/api/bundles/authorize','BAPG → สร้าง Immutable Bundle'],
+                ].map(r=>`<tr><td class="mono text-center" style="color:${r[0]==='POST'?'var(--g)':'var(--c)'}">${r[0]}</td><td class="mono" style="color:var(--c)">${r[1]}</td><td class="text-[11px] text-white/75">${r[2]}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- QC MATRIX -->
+      <section id="qc" class="sec glass rounded-2xl p-6">
+        <div class="mono text-xs tracking-[.3em]" style="color:var(--g)">// PART 5 · QC MATRIX · HOW WE MEASURE</div>
+        <h3 class="text-xl font-bold mt-1 mb-3">QC 8 Axes ที่ 2 ระบบนี้ต้องรับผิดชอบโดยตรง</h3>
+        <table class="tbl">
+          <thead><tr><th>QC AXIS</th><th>OWNER SYSTEM</th><th>THRESHOLD</th><th>ACTION IF FAIL</th></tr></thead>
+          <tbody>
+            ${[
+              ['Identity Drift','Character + Engine','< 3%','> 5% = REJECT · 3–5% = Delta'],
+              ['Face Consistency','Character DNA','< 4%','> 6% = REJECT'],
+              ['Prompt Validation','Prompt Engine','100% valid','Fail Build · แจ้งโมดูลไหนผิด'],
+              ['Brand Validation','Character Sheet','100% match','Block Module ที่ขัด'],
+              ['Typography','Engine Module 07','0 text in render','Inject Negative + Re-check'],
+              ['Composition','Engine · Camera/Pose','Pass / Review','Warning ไป QC Center'],
+              ['Resolution','Engine · Render Params','≥ Target','Auto Scale Config'],
+              ['Consistency','Bundle Hash','100% same bundle','ถ้าเปลี่ยน = ใหม่ = Version++'],
+            ].map(r=>`<tr><td class="mono font-semibold">${r[0]}</td><td class="text-[11px]" style="color:${r[1].includes('Character')?'var(--p)':'var(--c)'}">${r[1]}</td><td class="mono text-center a">${r[2]}</td><td class="text-[11px] text-white/75">${r[3]}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- STATUS / NEXT -->
+      <section id="status" class="sec glass rounded-2xl p-6 text-sm">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div class="mono text-xs tracking-[.3em]" style="color:var(--v)">// SPEC STATUS</div>
+            <h3 class="text-xl font-bold mt-1">Combined Spec · <span class="rgb">รวดเดียวจบ</span></h3>
+            <p class="text-white/60 mt-1 max-w-2xl">
+              ไฟล์นี้คือ <strong>หัวใจของ W//FORGE</strong> — ครอบคลุมทั้ง Character Identity System และ Modular Prompt Engine
+              รวม Integration, DB, API, QC, OFFEYEZ Standard และ Drift Protection ไว้ในที่เดียว
+              <strong>ไม่แยกออกเป็นสองไฟล์</strong> เพื่อรักษา One Source of Truth และไม่ทำให้โปรเจกต์ยาวเกินไป
+            </p>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-center text-xs shrink-0">
+            <div class="metal rounded-lg p-2.5"><div class="mono text-[9px] text-white/50">SPEC STATUS</div><div class="font-bold a mt-0.5">DESIGN ✓</div></div>
+            <div class="metal rounded-lg p-2.5"><div class="mono text-[9px] text-white/50">READY FOR</div><div class="font-bold g mt-0.5">DEV · IMPL</div></div>
+          </div>
+        </div>
+        <div class="mt-4 p-3 rounded-xl" style="background:linear-gradient(90deg,rgba(236,72,153,.1),rgba(6,182,212,.08));border:1px solid rgba(139,92,246,.25)">
+          <div class="mono text-[10px] tracking-[.2em] mb-1" style="color:var(--v)">→ NEXT IN ORDER (จากนี้ไป)</div>
+          <div class="text-xs text-white/75">
+            1) <strong>W//FORGE-SK-Database.md</strong> (สร้าง Schema จริงจาก Tables ข้างบน) →
+            2) <strong>W//FORGE-SK-API.md</strong> (เขียน Contract ตาม Endpoints) →
+            3) <strong>Frontend + Design System</strong> (เริ่มจาก Character Sheet + Prompt Builder UI)
+          </div>
+        </div>
+      </section>
+
+      <section class="glass rounded-2xl p-4 text-center">
+        <div class="mono text-[10px] tracking-[.35em] text-white/40">— END OF COMBINED SPEC —</div>
+        <div class="mt-1 text-xs text-white/60">W//FORGE-SK-Character + PromptEngine.md · v0.1.0 · Single File · One Source of Truth</div>
+      </section>
+
+    </main>
+  </div>
+</div>
+</div>
+</html>
+
+<script>
+const TOC = [
+  ['top','⌂ Doc Overview'],
+  ['char-overview','PART 1 · Character System'],
+  ['char-dna','1.1 DNA Schema (7 Axes)'],
+  ['char-libs','1.2 Sheet + Libraries'],
+  ['char-lock','1.3 Lock / Drift'],
+  ['pe-overview','PART 2 · Prompt Engine'],
+  ['pe-modules','2.1 8 Modules'],
+  ['pe-build','2.2 Build Logic'],
+  ['pe-neg','2.3 Negative + Params'],
+  ['integration','PART 3 · Integration'],
+  ['db-api','PART 4 · DB + API'],
+  ['qc','PART 5 · QC Matrix'],
+  ['status','Status · Next'],
+];
+const el = document.getElementById('toc');
+TOC.forEach(s=>el.insertAdjacentHTML('beforeend',`<div class="toc px-2.5 py-1.5 rounded-md text-[12px] text-white/70" data-id="${s[0]}">${s[1]}</div>`));
+const items = [...document.querySelectorAll('.toc')];
+function set(id){ items.forEach(i=>i.classList.toggle('active',i.dataset.id===id)) }
+el.addEventListener('click',e=>{
+  const t=e.target.closest('.toc'); if(!t) return;
+  const x=document.getElementById(t.dataset.id); if(x){x.scrollIntoView({behavior:'smooth',block:'start'}); set(t.dataset.id);}
+});
+const io = new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting) set(e.target.id)})},{rootMargin:'-40% 0px -55% 0px'});
+TOC.forEach(s=>{const x=document.getElementById(s[0]); if(x) io.observe(x)});
+</script>
