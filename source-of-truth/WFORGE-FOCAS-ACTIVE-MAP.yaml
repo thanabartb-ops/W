@@ -1,0 +1,137 @@
+schema: wforge.focas.active_map
+schema_version: "1.0"
+document_version: "1.0.0"
+status: ACTIVE_ALIGNMENT
+created_at: "2026-08-09"
+owner: BANK
+controller: W//FORGE ONE
+source_policy: SINGLE_ACTIVE_SET
+
+focus:
+  command: "@FOCAS"
+  canonical_module: FOCAS+
+  role: REFERENCE_BODY_WORLD_ORCHESTRATOR
+  character_runtime: SERREZ-CONTROL
+  visual_style_authority: STYLE-CONTROL-150
+  identity_authority: WFORGE_CHARACTER_SERREZ_IDENTITY_LOCK_v1.0.yaml
+  project_authority:
+    - APPROVED_FINAL_BRIEF
+    - APPROVED_CORRECTION_DELTA
+
+runtime_resolution:
+  active_scene_orchestrator: FOCAS+
+  legacy_scene_library:
+    module: FOGAS
+    role: REFERENCE_LIBRARY_INPUT_ONLY
+    may_become_runtime: false
+    may_authorize_render: false
+  deprecated_ambiguous_value: FOGAS_OR_FOCAS_PLUS
+  replacement_value: FOCAS_PLUS
+
+active_reference_set:
+  set_id: FOCAS-SERREZ-BODY-WORLD-20260809-A
+  body_calibration:
+    status: ACTIVE_CALIBRATION_NOT_HARD_LOCKED
+    primary: 1000049309.png
+    confirmation: 1000049306.png
+    supersedes_for_focas_calibration:
+      - 1000049308.png
+    allowed_scope:
+      - VERTICAL_BODY_LANDMARKS
+      - TORSO_TO_LEG_RELATION
+      - SHOULDER_WAIST_HIP_RELATION
+      - LIMB_ELONGATION
+      - UNDERLYING_BODY_SILHOUETTE
+    prohibited_scope:
+      - FACE_GEOMETRY
+      - HUMAN_IDENTITY
+      - HAIR
+      - HORNS
+      - BLINDFOLD
+      - SKIN_MATERIAL
+  scene_reference:
+    id: FPLUS-S21
+    status: ACTIVE_REFERENCE_NOT_ACTIVE_WORLD
+    activation_requires: OWNER_APPROVAL_FOR_WORLD_ACTIVATION
+
+identity_resolution:
+  identity_drift: ZERO_TOLERANCE
+  blindfold:
+    policy: KEEP_BY_DEFAULT
+    remove_only_after: APPROVED_EYE_REFERENCE
+    opaque: true
+    eyes_visible_through_blindfold: false
+  twin_tail_silhouette: LOCKED
+  demon_horns: LOCKED
+  source_reference_can_override_identity: false
+
+world_resolution:
+  current_active_world_from_identity_lock: S10_RED_UNDERGROUND_ARENA
+  focas_scene_reference: FPLUS-S21
+  focas_scene_is_active_world: false
+  automatic_world_switch: FORBIDDEN
+
+integration_routing:
+  AppDeploy:
+    role: WEBSITE_DEPLOY_RUNTIME
+    status: CONNECTED
+  GitHub:
+    role: SOURCE_VERSION_YAML_AUTHORITY
+    status: CONNECTED
+  Supabase:
+    role: OPERATIONAL_STATE_AUTH_STORAGE_SEARCH
+    status: CONNECTED
+  Codex_Security:
+    role: SECURITY_POLICY_GATE
+    status: CONNECTED_CONTROL
+    deny_is_final: true
+  Consensus:
+    role: RESEARCH_EVIDENCE_VALIDATION
+    status: CONNECTED
+    production_authority: false
+  Linear:
+    role: BUILD_TEST_QC_TRACKING
+    status: CONNECTED
+  Sentry:
+    role: RUNTIME_OBSERVABILITY
+    status: UNVERIFIED
+  Sites:
+    role: DEPRECATED_CHAT_WORKFLOW
+    status: DISABLED_FOR_ACTIVE_ROUTING
+
+render_security:
+  render_gate: LOCKED
+  valid_authorization_command: "@BAPG"
+  authorization_scope: ONE_TIME_CURRENT_LIVE_MESSAGE
+  persistence: false
+  replay_allowed: false
+  appdeploy_can_open_gate: false
+  github_can_open_gate: false
+  supabase_can_open_gate: false
+  codex_security_can_open_gate: false
+  consensus_can_open_gate: false
+  linear_can_open_gate: false
+  focas_can_open_gate: false
+
+conflict_resolution:
+  identity_vs_reference: IDENTITY_LOCK_WINS
+  approved_final_brief_vs_focas: APPROVED_FINAL_BRIEF_WINS
+  correction_delta_vs_final_brief: APPROVED_CORRECTION_DELTA_SCOPED_CHANGE_ONLY
+  focas_vs_fogas: FOCAS_PLUS_WINS_FOR_ACTIVE_ORCHESTRATION
+  brand_color_vs_scene_color: APPROVED_BRAND_COLOR_WINS
+  body_vs_wardrobe_volume: BODY_PROFILE_WINS
+
+immutability:
+  locked_final_brief_direct_edit: FORBIDDEN
+  correction_method: CORRECTION_DELTA_ONLY
+
+qc:
+  authority_single_active_set: PASS
+  focas_runtime_ambiguity: RESOLVED
+  identity_boundary: PASS
+  blindfold_policy_alignment: PASS
+  world_activation_guard: PASS
+  render_gate: LOCKED
+  external_observability: PENDING_SENTRY_VERIFICATION
+
+next_allowed_action: SYNC_RUNTIME_SURFACES_AND_QC
