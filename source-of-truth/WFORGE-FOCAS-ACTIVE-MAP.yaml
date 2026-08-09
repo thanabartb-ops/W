@@ -1,8 +1,9 @@
 schema: wforge.focas.active_map
 schema_version: "1.0"
-document_version: "1.0.0"
+document_version: "1.1.0"
 status: ACTIVE_ALIGNMENT
 created_at: "2026-08-09"
+updated_at: "2026-08-09T19:03:00+07:00"
 owner: BANK
 controller: W//FORGE ONE
 source_policy: SINGLE_ACTIVE_SET
@@ -31,7 +32,8 @@ runtime_resolution:
 active_reference_set:
   set_id: FOCAS-SERREZ-BODY-WORLD-20260809-A
   body_calibration:
-    status: ACTIVE_CALIBRATION_NOT_HARD_LOCKED
+    status: HARD_LOCKED_OWNER_APPROVED
+    approved_at: "2026-08-09T19:03:00+07:00"
     primary: 1000049309.png
     confirmation: 1000049306.png
     supersedes_for_focas_calibration:
@@ -51,8 +53,9 @@ active_reference_set:
       - SKIN_MATERIAL
   scene_reference:
     id: FPLUS-S21
-    status: ACTIVE_REFERENCE_NOT_ACTIVE_WORLD
-    activation_requires: OWNER_APPROVAL_FOR_WORLD_ACTIVATION
+    status: ACTIVE_WORLD_OWNER_APPROVED
+    approved_at: "2026-08-09T19:03:00+07:00"
+    activation_requires: SATISFIED_OWNER_APPROVAL
 
 identity_resolution:
   identity_drift: ZERO_TOLERANCE
@@ -66,9 +69,11 @@ identity_resolution:
   source_reference_can_override_identity: false
 
 world_resolution:
-  current_active_world_from_identity_lock: S10_RED_UNDERGROUND_ARENA
+  previous_active_world_from_identity_lock: S10_RED_UNDERGROUND_ARENA
+  current_active_world: FPLUS-S21
   focas_scene_reference: FPLUS-S21
-  focas_scene_is_active_world: false
+  focas_scene_is_active_world: true
+  activation_authority: OWNER_APPROVAL
   automatic_world_switch: FORBIDDEN
 
 integration_routing:
@@ -94,17 +99,34 @@ integration_routing:
     status: CONNECTED
   Sentry:
     role: RUNTIME_OBSERVABILITY
-    status: UNVERIFIED
+    status: CONNECTED_UI_TOOL_UNVERIFIED
   Sites:
     role: DEPRECATED_CHAT_WORKFLOW
     status: DISABLED_FOR_ACTIVE_ROUTING
+
+style_control:
+  id: STYLE-CONTROL-150
+  status: ACTIVE
+  audit_status: PENDING
+  reason: SOURCE_ARCHIVE_STYLE_CONTROL_ZIP_NOT_AVAILABLE_FOR_FULL_150_IMAGE_AUDIT
+  pass_claim_allowed: false
+
+repository_state:
+  repository: thanabartb-ops/W
+  base_branch: main
+  pr_3:
+    status: MERGED
+    merge_commit: 85b95ec86db715d5eba5d058b3df643ca90b5138
+    owner_merge_approval: APPROVED
 
 render_security:
   render_gate: LOCKED
   valid_authorization_command: "@BAPG"
   authorization_scope: ONE_TIME_CURRENT_LIVE_MESSAGE
+  authorization_state: INVALID
   persistence: false
   replay_allowed: false
+  render_performed: false
   appdeploy_can_open_gate: false
   github_can_open_gate: false
   supabase_can_open_gate: false
@@ -130,8 +152,11 @@ qc:
   focas_runtime_ambiguity: RESOLVED
   identity_boundary: PASS
   blindfold_policy_alignment: PASS
-  world_activation_guard: PASS
+  body_proportion_hard_lock: PASS_OWNER_APPROVED
+  world_activation_guard: PASS_OWNER_APPROVED
+  style_control_150_audit: PENDING
+  sentry_tool_verification: PENDING
   render_gate: LOCKED
-  external_observability: PENDING_SENTRY_VERIFICATION
+  render_performed: false
 
-next_allowed_action: SYNC_RUNTIME_SURFACES_AND_QC
+next_allowed_action: COMPLETE_STYLE_CONTROL_150_AUDIT_AND_SENTRY_TOOL_VERIFICATION
