@@ -1,0 +1,373 @@
+schema:
+  name: WFORGE_STYLE_MANIFEST
+  version: 1.0.0
+  document_type: STYLE_REFERENCE_MANIFEST
+  status: ACTIVE_DRAFT
+  purpose:
+  - Declare the canonical visual style reference set
+  - Separate verified metadata from unaudited claims
+  - Control identity, style, typology, and world continuity
+  - Provide deterministic routing rules for visual production
+  - Prevent accidental drift and unauthorized render execution
+identity:
+  manifest_id: STYLE-CONTROL-150
+  display_name: STYLE-CONTROL-150
+  system: WFORGE-EVOLUTION
+  system_version: EVOLUTION-1.0.0
+  owner: BANK
+  controller: W//FORGE ONE
+  runtime_target: SERREZ-CONTROL
+  created_at: '2026-08-05T21:53:00+07:00'
+  timezone: Asia/Bangkok
+source:
+  source_of_truth_policy: SINGLE_ACTIVE_SET
+  source_archive:
+    filename: style control.zip
+    declared_image_count: 150
+    verification_status: DECLARED_NOT_AUDITED
+    archive_hash: null
+    archive_size_bytes: null
+    extracted_file_count: null
+    duplicate_count: null
+    corrupt_file_count: null
+    unsupported_file_count: null
+    last_verified_at: null
+  repository_target:
+    repository: thanabartb-ops/W
+    branch: bring-skill-style-manifest
+    target_path: style/STYLE-CONTROL-150/MANIFEST.yaml
+    commit_status: NOT_COMMITTED
+  historical_policy:
+    older_conflicting_style_sets: HISTORICAL
+    automatic_merge_with_older_sets: false
+    latest_verified_active_set_only: true
+status:
+  reference_set_status: ACTIVE
+  manifest_status: ACTIVE_DRAFT
+  audit_status: PENDING
+  production_authority: CONDITIONAL
+  ready_for_render_reference: false
+  ready_for_production_lock: false
+  reason: The archive and all 150 declared images have not yet been audited and fingerprinted.
+scope:
+  included_domains:
+  - WFORGE
+  - BANKDNA
+  - SERREZ
+  - KEY_VISUAL
+  - PROMOTIONAL_DESIGN
+  excluded_by_default:
+  - Unrelated client identities
+  - Unapproved external character identities
+  - Historical style packs
+  - Experimental looks not approved in a Reference Map
+  - Any visual asset outside the declared active set
+  project_override_rule:
+    allowed: true
+    requires:
+    - Approved Reference Map
+    - Approved Final Brief
+    must_preserve:
+    - Core identity
+    - Character recognizability
+    - Brand hierarchy
+    - Creative integrity gate
+creative_locks:
+  required:
+  - DNA
+  - AAA_QUALITY
+  - OPEN_WORLD_CONTINUITY
+  - IDENTITY
+  - STYLE
+  - TYPOLOGY
+  - MOBILE_READABILITY
+  - EXACT_TEXT_ACCURACY
+  tolerance:
+    identity_drift: ZERO_TOLERANCE
+    character_drift: ZERO_TOLERANCE
+    brand_drift: ZERO_TOLERANCE
+    style_drift: CONTROLLED_ONLY
+    material_repetition: CONTROLLED
+    reference_drift: ZERO_TOLERANCE
+    typography_drift: CONTROLLED_ONLY
+visual_dna:
+  primary_direction: CHARACTER_LED_WORLD_BUILDING
+  core_style: DARK_PREMIUM_STREET_GAMING
+  quality_bar: AAA_PRODUCTION
+  composition:
+    hero_first: true
+    offer_object_clear: true
+    strong_hierarchy: true
+    mobile_readability: true
+    controlled_negative_space: true
+    avoid_random_centering: true
+  lighting:
+    controlled_rim_light: true
+    controlled_soft_neon: true
+    material_separation: true
+    avoid_excessive_bloom: true
+    avoid_excessive_fog: true
+    avoid_flat_global_light: true
+  materials:
+    pbr_bias: true
+    sharp_edge_definition: true
+    controlled_specular_response: true
+    avoid_unmotivated_chrome: true
+    avoid_material_repetition: true
+  color:
+    brand_color_priority: true
+    project_brand_over_global_accent: true
+    forge_violet_role: DEFAULT_ACCENT_ONLY
+    hyper_hex_rgb_allowed: true
+    neon_role: CONTROLLED_SUPPORT
+    text_glow_role: SECONDARY_SUPPORT
+    rim_light_role: SEPARATION_NOT_DOMINANCE
+  atmosphere:
+    world_building_required: true
+    gaming_atmosphere: true
+    premium_dark_base: true
+    visual_noise: CONTROLLED
+    graffiti_default: false
+identity_control:
+  BANK:
+    role: OWNER_AND_FINAL_DECISION_MAKER
+    primary_identity: true
+    override_authority: LATEST_EXPLICIT_INSTRUCTION_WITHIN_SAFETY
+  WFORGE:
+    role: VISUAL_PRODUCTION_OPERATING_SYSTEM
+    is_character: false
+    may_replace_BANK_identity: false
+  SERREZ:
+    role: SECONDARY_IDENTITY_AND_SECRETARY_CHARACTER
+    may_be_project_main_hero: true
+    must_preserve:
+    - Recognizable face
+    - Twin-tail silhouette
+    - Demon horns
+    - Playful confident fashion-forward energy
+    conditional_signatures:
+      blindfold:
+        status: CONDITIONAL
+        removal_requires:
+        - Approved Reference Map
+        - Approved Final Brief
+    look_router:
+      status: ALWAYS_ON
+      base_look_per_render: 1
+      mix_multiple_base_looks: false
+      rotation_control:
+        minimum_change_per_round: 1
+        allowed_change_axes:
+        - Color
+        - Accessories
+        - Pose
+        - Outfit within approved look
+        identity_preservation_required: true
+  NOVA:
+    role: PET_CHARACTER
+    use: PROJECT_CONTEXT_ONLY
+    must_follow: NOVA STANDARD CHARACTER SPEC
+typology_control:
+  definition: Typography must behave as a physical and hierarchical part of the visual world, not as a flat overlay.
+  required:
+  - Hierarchy
+  - Depth
+  - Material
+  - Lighting integration
+  - Edge quality
+  - Mobile readability
+  - Exact copy
+  - Brand color priority
+  default_preferences:
+    three_dimensional_type: true
+    graffiti: false
+    sharp_detail: true
+    controlled_glow: true
+  prohibited:
+  - Changing words, numbers, conditions, or CTA without approval
+  - Glow competing with the hero
+  - Fog obscuring text
+  - Typography overpowering the visual hierarchy
+  - Decorative effects that reduce mobile readability
+reference_routing:
+  principle: Use the minimum sufficient approved references and keep them close to the generation task.
+  required_sequence:
+  - Identify project objective
+  - Select one base look
+  - Select identity reference
+  - Select environment or mood reference
+  - Select typography or layout reference when needed
+  - Build Reference Map
+  - Approve Reference Map
+  - Lock Final Brief
+  recommended_reference_roles:
+  - Character identity
+  - Outfit or approved look
+  - Background or environment
+  - Lighting or mood
+  - Typography or layout
+  rules:
+    one_base_look_per_render: true
+    reference_map_required_before_final_brief_lock: true
+    unapproved_reference_injection: false
+    distant_or_ambiguous_reference_use: false
+    historical_reference_auto_reuse: false
+project_binding:
+  manifest_controls:
+  - Visual DNA
+  - Composition logic
+  - Lighting logic
+  - Material logic
+  - Atmosphere
+  - Identity preservation
+  - Color relationship
+  - Typography integration
+  - Open world continuity
+  final_brief_controls:
+  - Objective
+  - Offer
+  - Exact text
+  - Ratio
+  - Character role
+  - Scene
+  - Layout
+  - Project-specific hierarchy
+  - Project-specific color
+  - Output requirements
+  correction_delta_controls:
+  - Only approved post-lock corrections
+  conflict_resolution:
+  - Latest explicit BANK instruction within safety
+  - Approved Correction Delta
+  - Approved Final Brief
+  - This Manifest
+  - Defaults
+render_security:
+  render_gate: LOCKED
+  valid_authorization_command: '@BAPG'
+  authorization_scope: ONE_TIME_PER_INSTRUCTION
+  authorization_persistent: false
+  authorization_replay_allowed: false
+  render_performed: false
+  external_systems_that_cannot_open_gate:
+  - SERREZ-CONTROL site
+  - GitHub
+  - Slack
+  - Google Calendar
+  - Outlook Calendar
+  - Automation
+  - Manifest
+  non_authorizing_commands:
+  - '@Visualize'
+  - '@GWW'
+  - สร้างเลย
+  - Final Brief approval by itself
+audit_plan:
+  audit_required: true
+  audit_status: PENDING
+  minimum_checks:
+    archive_accessible: PENDING
+    declared_count_matches_extracted_count: PENDING
+    all_files_openable: PENDING
+    supported_formats_only: PENDING
+    duplicate_detection: PENDING
+    near_duplicate_review: PENDING
+    identity_consistency: PENDING
+    style_cluster_consistency: PENDING
+    typography_examples_review: PENDING
+    character_drift_review: PENDING
+    brand_color_priority_review: PENDING
+    mobile_readability_review: PENDING
+    metadata_inventory: PENDING
+    hash_inventory: PENDING
+  recommended_inventory_fields:
+  - asset_id
+  - relative_path
+  - filename
+  - extension
+  - width
+  - height
+  - aspect_ratio
+  - file_size_bytes
+  - sha256
+  - perceptual_hash
+  - identity_tags
+  - style_tags
+  - typology_tags
+  - quality_status
+  - audit_notes
+  pass_rule:
+    archive_file_count: 150
+    corrupt_files: 0
+    unsupported_files: 0
+    critical_identity_failures: 0
+    critical_style_failures: 0
+    critical_typology_failures: 0
+    manual_review_required_for_near_duplicates: true
+  audit_result:
+    status: NOT_RUN
+    evidence_path: null
+    inventory_path: null
+    report_path: null
+    audited_at: null
+    audited_by: null
+quality_gate:
+  status: PENDING_AUDIT
+  checks:
+    manifest_yaml_valid: PENDING
+    scope_consistent: PASS
+    source_declared: PASS
+    archive_verified: PENDING
+    image_count_verified: PENDING
+    identity_rules_defined: PASS
+    visual_dna_defined: PASS
+    typology_rules_defined: PASS
+    reference_routing_defined: PASS
+    render_gate_locked: PASS
+    no_render_performed: PASS
+  ready_state_rule: READY only after manifest validation and archive audit both PASS
+change_control:
+  mutation_requires:
+  - Explicit BANK approval
+  - Recorded change scope
+  - Version increment when behavior changes
+  - QC after change
+  - Checkpoint update
+  allowed_change_types:
+  - Metadata correction
+  - Audit result update
+  - Approved lock refinement
+  - Approved routing refinement
+  - Versioned scope change
+  prohibited_without_new_approval:
+  - Replacing the source archive
+  - Changing declared image count
+  - Relaxing identity drift tolerance
+  - Opening render gate
+  - Promoting audit status to PASS
+  - Adding unrelated brands or characters
+  versioning:
+    metadata_only: PATCH
+    behavior_or_lock_change: MINOR
+    source archive replacement: MAJOR_OR_NEW_REFERENCE_SET
+handoff:
+  current_state: MANIFEST_DRAFT_READY_FOR_REVIEW
+  verified_facts:
+  - Reference set ID is STYLE-CONTROL-150
+  - Declared source archive is style control.zip
+  - Declared image count is 150
+  - Scope includes WFORGE, BANKDNA, SERREZ, KEY_VISUAL, and PROMOTIONAL_DESIGN
+  - Render gate remains LOCKED
+  unverified_claims:
+  - Archive contains exactly 150 valid images
+  - All images are unique
+  - All images pass identity and style QC
+  - All assets are production-ready
+  next_allowed_action: REVIEW_MANIFEST_DRAFT
+  not_authorized_yet:
+  - Commit to GitHub
+  - Run archive audit
+  - Change runtime
+  - Open Pull Request
+  - Merge
+  - Render
