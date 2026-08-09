@@ -111,6 +111,7 @@ runtime_state:
   system_status: READY
   deployment_status: NOT_APPLICABLE_TO_CHAT_RUNTIME
   integration_status: READY
+  runtime_modified: false
   render_gate: LOCKED
   render_authorization:
     valid_command: '@BAPG'
