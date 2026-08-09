@@ -1,0 +1,254 @@
+name: WFORGE QC
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - VERSION
+      - WFORGE-EVOLUTION.skill.md
+      - CHECKPOINT.yaml
+      - style/STYLE-CONTROL-150/MANIFEST.yaml
+      - expert-system/contract.json
+      - .github/workflows/wforge-qc.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wforge-qc-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  structural-qc:
+    name: Structural contract QC
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validator dependencies
+        run: python -m pip install --disable-pip-version-check PyYAML==6.0.2
+
+      - name: Validate WFORGE active set
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          import yaml
+
+          ROOT = Path(".")
+          EXPECTED_VERSION = "EVOLUTION-1.0.0"
+          REQUIRED_FILES = {
+              "version": ROOT / "VERSION",
+              "skill": ROOT / "WFORGE-EVOLUTION.skill.md",
+              "checkpoint": ROOT / "CHECKPOINT.yaml",
+              "manifest": ROOT / "style/STYLE-CONTROL-150/MANIFEST.yaml",
+              "contract": ROOT / "expert-system/contract.json",
+          }
+
+          errors: list[str] = []
+          notes: list[str] = []
+
+          def fail(message: str) -> None:
+              errors.append(message)
+              print(f"::error::{message}")
+
+          def note(message: str) -> None:
+              notes.append(message)
+              print(f"::notice::{message}")
+
+          for label, path in REQUIRED_FILES.items():
+              if not path.is_file():
+                  fail(f"Missing required {label} file: {path.as_posix()}")
+
+          if errors:
+              print("\nRequired active-set files are incomplete.")
+              sys.exit(1)
+
+          version = REQUIRED_FILES["version"].read_text(encoding="utf-8").strip()
+          if version != EXPECTED_VERSION:
+              fail(f"VERSION must be {EXPECTED_VERSION!r}, found {version!r}")
+
+          skill_text = REQUIRED_FILES["skill"].read_text(encoding="utf-8")
+          if not skill_text.startswith("---\n"):
+              fail("WFORGE-EVOLUTION.skill.md must begin with YAML front matter")
+              skill_meta = {}
+          else:
+              match = re.match(r"^---\n(.*?)\n---(?:\n|$)", skill_text, flags=re.DOTALL)
+              if not match:
+                  fail("Unable to parse skill YAML front matter")
+                  skill_meta = {}
+              else:
+                  try:
+                      skill_meta = yaml.safe_load(match.group(1)) or {}
+                  except yaml.YAMLError as exc:
+                      fail(f"Skill front matter YAML is invalid: {exc}")
+                      skill_meta = {}
+
+          try:
+              checkpoint = yaml.safe_load(REQUIRED_FILES["checkpoint"].read_text(encoding="utf-8"))
+          except yaml.YAMLError as exc:
+              fail(f"CHECKPOINT.yaml is invalid YAML: {exc}")
+              checkpoint = {}
+
+          try:
+              manifest = yaml.safe_load(REQUIRED_FILES["manifest"].read_text(encoding="utf-8"))
+          except yaml.YAMLError as exc:
+              fail(f"MANIFEST.yaml is invalid YAML: {exc}")
+              manifest = {}
+
+          try:
+              contract = json.loads(REQUIRED_FILES["contract"].read_text(encoding="utf-8"))
+          except json.JSONDecodeError as exc:
+              fail(f"contract.json is invalid JSON: {exc}")
+              contract = {}
+
+          versions = {
+              "VERSION": version,
+              "skill": skill_meta.get("version"),
+              "checkpoint": checkpoint.get("identity", {}).get("system_version"),
+              "manifest": manifest.get("identity", {}).get("system_version"),
+              "contract": contract.get("metadata", {}).get("system_version"),
+          }
+          for source, value in versions.items():
+              if value != EXPECTED_VERSION:
+                  fail(f"Version mismatch in {source}: expected {EXPECTED_VERSION!r}, found {value!r}")
+
+          systems = {
+              "checkpoint": checkpoint.get("identity", {}).get("system"),
+              "manifest": manifest.get("identity", {}).get("system"),
+              "contract": contract.get("metadata", {}).get("system"),
+          }
+          for source, value in systems.items():
+              if value != "WFORGE-EVOLUTION":
+                  fail(f"System identity mismatch in {source}: {value!r}")
+
+          runtime_targets = {
+              "skill": skill_meta.get("runtime_target"),
+              "checkpoint": checkpoint.get("identity", {}).get("runtime_target"),
+              "manifest": manifest.get("identity", {}).get("runtime_target"),
+              "contract": contract.get("metadata", {}).get("runtime_target"),
+          }
+          for source, value in runtime_targets.items():
+              if value != "SERREZ-CONTROL":
+                  fail(f"Runtime target mismatch in {source}: {value!r}")
+
+          render_gates = {
+              "skill": skill_meta.get("render_gate"),
+              "checkpoint": checkpoint.get("runtime_state", {}).get("render_gate"),
+              "manifest": manifest.get("render_security", {}).get("render_gate"),
+              "contract": contract.get("render_security", {}).get("render_gate_default"),
+          }
+          for source, value in render_gates.items():
+              if value != "LOCKED":
+                  fail(f"Render gate must remain LOCKED in {source}, found {value!r}")
+
+          manifest_id = manifest.get("identity", {}).get("manifest_id")
+          contract_reference_set = contract.get("style_control", {}).get("active_reference_set")
+          if manifest_id != "STYLE-CONTROL-150":
+              fail(f"Unexpected manifest ID: {manifest_id!r}")
+          if contract_reference_set != manifest_id:
+              fail(
+                  "Style reference mismatch: "
+                  f"contract={contract_reference_set!r}, manifest={manifest_id!r}"
+              )
+
+          declared_count = manifest.get("source", {}).get("source_archive", {}).get("declared_image_count")
+          contract_count = contract.get("style_control", {}).get("declared_image_count")
+          if declared_count != 150 or contract_count != 150:
+              fail(
+                  "STYLE-CONTROL-150 declared image count must remain 150: "
+                  f"manifest={declared_count!r}, contract={contract_count!r}"
+              )
+
+          audit_values = {
+              "manifest": manifest.get("audit_plan", {}).get("audit_status"),
+              "contract": contract.get("style_control", {}).get("audit_status"),
+          }
+          for source, value in audit_values.items():
+              if value != "PENDING":
+                  fail(f"Audit status must remain PENDING until evidence exists in {source}, found {value!r}")
+
+          if manifest.get("status", {}).get("ready_for_render_reference") is not False:
+              fail("Manifest ready_for_render_reference must remain false before audit PASS")
+          if manifest.get("status", {}).get("ready_for_production_lock") is not False:
+              fail("Manifest ready_for_production_lock must remain false before audit PASS")
+          if contract.get("style_control", {}).get("ready_for_production_lock") is not False:
+              fail("Contract ready_for_production_lock must remain false before audit PASS")
+
+          valid_qc_statuses = {
+              "NOT_STARTED",
+              "PENDING",
+              "PASS",
+              "PASS_WITH_NOTES",
+              "FAIL",
+              "BLOCKED",
+          }
+          contract_qc_statuses = set(contract.get("quality_control", {}).get("qc_statuses", []))
+          if contract_qc_statuses != valid_qc_statuses:
+              fail(
+                  "Contract QC status enum differs from canonical set: "
+                  f"{sorted(contract_qc_statuses)!r}"
+              )
+
+          canonical_states = set(contract.get("state_machine", {}).get("canonical_states", []))
+          allowed_transitions = contract.get("state_machine", {}).get("allowed_transitions", {})
+          for source_state, targets in allowed_transitions.items():
+              if source_state not in canonical_states:
+                  fail(f"Transition source is not canonical: {source_state}")
+              for target in targets:
+                  if target not in canonical_states:
+                      fail(f"Transition target is not canonical: {source_state} -> {target}")
+
+          next_actions = contract.get("state_machine", {}).get("next_action_mapping", {})
+          missing_next_actions = canonical_states.difference(next_actions)
+          if missing_next_actions:
+              fail(f"Missing next-action mappings: {sorted(missing_next_actions)!r}")
+
+          required_contract_files = set(contract.get("validation", {}).get("required_files", []))
+          expected_contract_files = {
+              "VERSION",
+              "WFORGE-EVOLUTION.skill.md",
+              "CHECKPOINT.yaml",
+              "style/STYLE-CONTROL-150/MANIFEST.yaml",
+              "expert-system/contract.json",
+          }
+          if required_contract_files != expected_contract_files:
+              fail(
+                  "Contract required_files differs from canonical active set: "
+                  f"{sorted(required_contract_files)!r}"
+              )
+
+          if checkpoint.get("runtime_state", {}).get("runtime_modified") is not False:
+              fail("Checkpoint must state runtime_modified=false at this foundation stage")
+          if checkpoint.get("runtime_state", {}).get("render_execution", {}).get("render_performed") is not False:
+              fail("Checkpoint must state render_performed=false")
+          if contract.get("source_preservation", {}).get("runtime_modified") is not False:
+              fail("Contract must state runtime_modified=false")
+          if contract.get("source_preservation", {}).get("github_modified") is not False:
+              note("contract.json still records github_modified=false; update only after an approved checkpoint revision")
+
+          if errors:
+              print(f"\nWFORGE QC: FAIL ({len(errors)} error(s), {len(notes)} note(s))")
+              sys.exit(1)
+
+          print(f"\nWFORGE QC: PASS ({len(notes)} note(s))")
+          print("Render gate: LOCKED")
+          print("STYLE-CONTROL-150 audit: PENDING")
+          print("Runtime modified: false")
+          PY
