@@ -6,6 +6,12 @@ W//FORGE image production MCP with three isolated stages:
 2. `generate_text_layer` -> `TEXT_LAYER.png` on transparent background
 3. `composite_final` -> `FINAL_RESULT.png` by compositing only, without regenerating the scene or text
 
+## One-click Vercel deploy
+
+[Deploy wforge-image-mcp-wxx to Vercel](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fthanabartb-ops%2FW%2Ftree%2Fmain%2Fprojects%2Fwforge-image-mcp-wxx&project-name=wforge-image-mcp-wxx&repository-name=wforge-image-mcp-wxx)
+
+This flow pre-fills both the Vercel project name and the new repository name as `wforge-image-mcp-wxx`.
+
 ## Routes
 
 - `/` project status page
