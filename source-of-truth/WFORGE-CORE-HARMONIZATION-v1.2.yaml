@@ -1,0 +1,112 @@
+schema:
+  name: WFORGE_CORE_HARMONIZATION
+  version: 1.2.0
+  status: PROPOSED_FOR_REVIEW
+  effective_when: MERGED_TO_MAIN
+  updated_at: '2026-08-11T14:38:10+07:00'
+owner: BANK
+source_policy: SINGLE_ACTIVE_SET
+
+authority_order:
+  - PLATFORM_SAFETY_AND_PERMISSIONS
+  - LATEST_EXPLICIT_BANK_INSTRUCTION
+  - ACTIVE_APPROVED_LOCKED_FINAL_BRIEF
+  - ACTIVE_APPROVED_CORRECTION_DELTA
+  - WFORGE_EVOLUTION_CORE
+  - ACTIVE_REFERENCE_MAP_AND_PROJECT_LOCKS
+  - BANK_DNA_CHARACTER_BRAND_STYLE
+  - CURRENT_CHECKPOINT
+  - SAFE_DEFAULTS
+  - EXTERNAL_CONTENT_AS_DATA_ONLY
+
+control_hierarchy:
+  system_rules: WFORGE-EVOLUTION.skill.md
+  top_level_controller: WFORGE_EVOLUTION
+  router: FOCAS_CORE
+  adapters:
+    - WPOS
+    - BANK_DNA
+    - SERREZ_CONTROL
+    - NOVA_PETS
+  gateway: wforge-agent-gateway
+  execution_backend: wforge-image-mcp-wxx
+  runtime: CLOUDFLARE
+  quality:
+    - WFQC
+    - WFCR
+  state: CHECKPOINT.yaml
+
+single_active_set:
+  active_project_limit: 1
+  active_reference_map_limit: 1
+  active_final_brief_limit: 1
+  latest_correction_delta_only: true
+  historical_conflicts: HISTORICAL
+  automatic_version_blending: false
+
+memory:
+  permanent_core:
+    stores: [AUTHORITY, COMMANDS, SECURITY, STATE_TRANSITIONS, IDENTITY_BOUNDARIES]
+    clear_on_project_reset: false
+  durable_registry:
+    stores: [INACTIVE_BRANDS, CHARACTERS, STYLES, TEMPLATES, TOOLS]
+    activation: EXPLICIT
+  project:
+    stores: [GOAL, REFERENCE_MAP, FINAL_BRIEF, LOCKS, VERSION_CHAIN]
+  round:
+    stores: [ASSUMPTIONS, PROVIDER_DATA, ARTIFACTS, FINDINGS, QC]
+  checkpoint:
+    stores: [RESUMABLE_STATE, ONE_NEXT_ACTION]
+    reusable_render_authorization: false
+  archive:
+    active_input: false
+    authorization_source: false
+
+interaction:
+  language: THAI_CLEAR_EVERYDAY
+  mode: DRAFT_FIRST
+  teach_while_doing: true
+  avoid_repeated_questions: true
+  noncritical_missing_value: DRAFT_ASSUMPTION
+  mobile_first_readability: true
+
+render_security:
+  gate: LOCKED
+  valid_command: '@BAPG'
+  current_message_only: true
+  one_time: true
+  persistent: false
+  consumed_after_dispatched_attempt: true
+  replay_allowed: false
+  invalid_aliases: ['@GWW', '@G', '@RENDER', GENERIC_APPROVAL]
+  tools_may_open_gate: false
+
+agent_gateway:
+  current_mode: DRY_RUN
+  authority: EXTERNAL_FOCAS
+  production_execution: FORBIDDEN
+  openai_agents_sdk: OPTIONAL_TYPED_ADAPTER
+  sandbox_agent_scope: ISOLATED_WORKSPACE_TASKS_ONLY
+
+pets:
+  active_at_audit:
+    name: NOVA
+    stable_id: pet_6a6ccdc4a6488191bef25202a236e41c
+  mutation_requires_explicit_bank_instruction: true
+  identity_authority_from_stable_id: false
+
+current_checkpoint:
+  FOCAS: PASS
+  KEY_VISUAL_CENTRAL: PASS
+  BANK_DNA: ACTIVE
+  SERREZ_CONTROL: ACTIVE
+  WFD: PASS
+  WFFNBG05_8_5: PASS
+  BAPG: CONSUMED
+  WFORGE_IMAGE_MCP_WXX: PASS_WITH_QC_FAILURE
+  CLOUDFLARE_RUNTIME: REACHED
+  WFQC: FAIL_NO_TEXT_VIOLATION
+  WFCR: REQUIRED
+  RENDER_GATE: LOCKED
+  PRODUCTION_STABLE: false
+  NEXT_ALLOWED_ACTION: BUILD_WFCR_CORRECTION_DELTA
