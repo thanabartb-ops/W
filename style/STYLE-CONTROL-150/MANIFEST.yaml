@@ -1,6 +1,6 @@
 schema:
   name: WFORGE_STYLE_MANIFEST
-  version: 1.0.0
+  version: 1.2.0
   document_type: STYLE_REFERENCE_MANIFEST
   status: ACTIVE_DRAFT
   purpose:
@@ -13,9 +13,9 @@ identity:
   manifest_id: STYLE-CONTROL-150
   display_name: STYLE-CONTROL-150
   system: WFORGE-EVOLUTION
-  system_version: EVOLUTION-1.0.0
+  system_version: EVOLUTION-1.2.0
   owner: BANK
-  controller: W//FORGE ONE
+  controller: WFORGE Evolution
   runtime_target: SERREZ-CONTROL
   created_at: '2026-08-05T21:53:00+07:00'
   timezone: Asia/Bangkok
@@ -34,9 +34,9 @@ source:
     last_verified_at: null
   repository_target:
     repository: thanabartb-ops/W
-    branch: bring-skill-style-manifest
+    branch: main
     target_path: style/STYLE-CONTROL-150/MANIFEST.yaml
-    commit_status: NOT_COMMITTED
+    commit_status: ACTIVE_IN_REPOSITORY
   historical_policy:
     older_conflicting_style_sets: HISTORICAL
     automatic_merge_with_older_sets: false
