@@ -1,6 +1,6 @@
 schema:
   name: LSUPERAGENT_MEMORY_CORE
-  version: 1.0.0
+  version: 1.1.0
   status: STAGED_FOR_REVIEW
   owner: THANABAT SOMSAK
   canonical_authority: LSUPERAGENT
@@ -36,6 +36,52 @@ memory_lifecycle:
     - append_audit_event
     - update_retrieval_index
 
+renderer_contract:
+  renderer: wforge-image-mcp-wxx
+  authority: execution_only
+  direct_memory_write: prohibited
+  allowed_stages:
+    - generate_scene
+    - generate_text_layer
+    - composite_final
+  required_before_render:
+    - locked_IMAGE_Spec
+    - BRIEF_PICTURE
+    - explicit_user_Approved
+  input_minimization:
+    prohibited:
+      - secrets
+      - Vault_values
+      - durable_profile_data
+      - unredacted_personal_data
+    references: approved_assets_or_authorized_URLs_only
+  stage_controls:
+    generate_scene: current_locked_brief_and_approval_only
+    generate_text_layer: copy_must_exactly_match_copy_source_of_truth
+    composite_final: immutable_scene_and_text_layer_refs_from_same_work_and_brief
+  required_artifact_manifest:
+    - work_id
+    - brief_hash
+    - approval_ref
+    - renderer
+    - stage
+    - source_artifact_refs
+    - output_ref
+    - aspect_ratio
+    - content_hash
+    - copy_integrity
+    - qc_status
+    - policy_decision_id
+  audit_actions:
+    - render_requested
+    - scene_rendered
+    - text_layer_rendered
+    - composite_rendered
+    - render_qc_passed
+    - render_qc_failed
+    - artifact_registered
+  promotion_rule: only_LSUPERAGENT_validates_and_registers_artifacts
+
 release_guard:
   database_migration: supabase/migrations/20260818000100_lsuperagent_memory_core.sql
   requires:
@@ -50,3 +96,4 @@ release_guard:
     - Direct browser access to lsuperagent schema
     - Public SECURITY DEFINER functions for memory writes
     - Raw secret storage in memory records
+    - Direct renderer writes to Supabase or canonical memory
