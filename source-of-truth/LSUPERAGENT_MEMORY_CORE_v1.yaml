@@ -1,0 +1,52 @@
+schema:
+  name: LSUPERAGENT_MEMORY_CORE
+  version: 1.0.0
+  status: STAGED_FOR_REVIEW
+  owner: THANABAT SOMSAK
+  canonical_authority: LSUPERAGENT
+
+source_of_truth:
+  durable_operational_memory: Supabase private schema lsuperagent
+  approval_and_audit: Supabase private schema lsuperagent
+  retrieval_index: derived from canonical records only
+  session_continuity: OpenAI Responses/Conversations, non-canonical
+  secrets: Supabase Vault references only
+
+hard_rules:
+  - No model output, compaction item, or session summary writes canonical memory directly.
+  - Every fact-like record has source references, evidence level, validity, and integrity hash.
+  - User preference and identity changes require explicit user approval.
+  - System state, release state, and operational lessons require independent validation.
+  - Audit events are append-only; corrections are new events, never silent edits.
+  - Client roles have no access to the private memory schema.
+
+memory_lifecycle:
+  states:
+    - candidate
+    - verified
+    - canonical
+    - superseded
+    - revoked
+    - expired
+  write_gate:
+    - classify_and_redact
+    - attach_source_and_scope
+    - policy_and_validator_check
+    - canonical_transaction
+    - append_audit_event
+    - update_retrieval_index
+
+release_guard:
+  database_migration: supabase/migrations/20260818000100_lsuperagent_memory_core.sql
+  requires:
+    - Draft PR review
+    - Security advisor re-check after apply
+    - Smoke query against private schema
+    - Edge Function or trusted server writer before client integration
+    - RELEASE_APPROVED for production migration
+  security_remediation:
+    - Revoke direct EXECUTE from public, anon, and authenticated on public.rls_auto_enable().
+  prohibited:
+    - Direct browser access to lsuperagent schema
+    - Public SECURITY DEFINER functions for memory writes
+    - Raw secret storage in memory records
