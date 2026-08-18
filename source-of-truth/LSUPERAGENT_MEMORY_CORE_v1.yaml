@@ -1,7 +1,7 @@
 schema:
   name: LSUPERAGENT_MEMORY_CORE
   version: 1.1.0
-  status: STAGED_FOR_REVIEW
+  status: DATABASE_FOUNDATION_DEPLOYED
   owner: THANABAT SOMSAK
   canonical_authority: LSUPERAGENT
 
@@ -11,6 +11,20 @@ source_of_truth:
   retrieval_index: derived from canonical records only
   session_continuity: OpenAI Responses/Conversations, non-canonical
   secrets: Supabase Vault references only
+
+release:
+  approval: RELEASE_APPROVED
+  production_project: lsuperagent-runtime
+  project_ref: ilzjtbfhoxirsuilwmor
+  applied_migration: 20260818200849_lsuperagent_memory_core
+  migration_source_sha: acce8fba75ca4772e05e58ca0148d36f81e0dfcf
+  verified:
+    - private_schema_exists
+    - RLS_enabled_on_memory_tables
+    - anon_and_authenticated_denied
+    - service_role_granted
+    - public_rls_auto_enable_execute_revoked
+  client_integration: blocked_until_trusted_writer_and_policy_gate_are_deployed
 
 hard_rules:
   - No model output, compaction item, or session summary writes canonical memory directly.
