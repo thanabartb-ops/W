@@ -84,6 +84,7 @@ begin
   raise exception 'memory audit events are append-only';
 end;
 $$;
+revoke all on function lsuperagent.reject_audit_event_mutation() from public, anon, authenticated;
 
 drop trigger if exists memory_audit_events_append_only on lsuperagent.memory_audit_events;
 create trigger memory_audit_events_append_only
