@@ -49,7 +49,10 @@ create table if not exists lsuperagent.memory_audit_events (
   memory_id uuid references lsuperagent.memory_records(memory_id) on delete restrict,
   action text not null check (action in (
     'candidate_created', 'validated', 'canonicalized', 'superseded',
-    'revoked', 'expired', 'retrieved', 'write_rejected'
+    'revoked', 'expired', 'retrieved', 'write_rejected',
+    'render_requested', 'scene_rendered', 'text_layer_rendered',
+    'composite_rendered', 'render_qc_passed', 'render_qc_failed',
+    'artifact_registered'
   )),
   actor_kind text not null check (actor_kind in ('human', 'service', 'agent', 'policy_engine')),
   actor_ref text not null,
