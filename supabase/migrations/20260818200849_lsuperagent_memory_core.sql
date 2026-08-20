@@ -48,8 +48,8 @@ create table if not exists lsuperagent.memory_audit_events (
   event_id uuid primary key default gen_random_uuid(),
   memory_id uuid references lsuperagent.memory_records(memory_id) on delete restrict,
   action text not null check (action in (
-    'candidate_created', 'validated', 'canonicalized', 'superseded',
-    'revoked', 'expired', 'retrieved', 'write_rejected',
+    'candidate_created', 'record_updated', 'validated', 'canonicalized',
+    'superseded', 'revoked', 'expired', 'retrieved', 'write_rejected',
     'render_requested', 'scene_rendered', 'text_layer_rendered',
     'composite_rendered', 'render_qc_passed', 'render_qc_failed',
     'artifact_registered'
@@ -72,11 +72,141 @@ alter table lsuperagent.memory_records enable row level security;
 alter table lsuperagent.memory_audit_events enable row level security;
 revoke all on lsuperagent.memory_records from public, anon, authenticated;
 revoke all on lsuperagent.memory_audit_events from public, anon, authenticated;
-grant select, insert, update, delete on lsuperagent.memory_records to service_role;
+grant select, insert, update on lsuperagent.memory_records to service_role;
 grant select, insert on lsuperagent.memory_audit_events to service_role;
 
--- Prevent silent alteration of evidence history. The runtime may append events,
--- but an audit correction must be represented by a new event instead.
+-- Enforce the canonical lifecycle at the database boundary. Physical deletes are
+-- forbidden, new records always begin as candidates, validated/canonical payloads
+-- are immutable, and every status transition must carry a policy decision.
+create or replace function lsuperagent.enforce_memory_record_lifecycle()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if TG_OP = 'DELETE' then
+    raise exception 'memory records are lifecycle-managed and cannot be deleted';
+  end if;
+
+  if TG_OP = 'INSERT' then
+    if NEW.status <> 'candidate' then
+      raise exception 'new memory records must start as candidate';
+    end if;
+    NEW.updated_at := pg_catalog.now();
+    return NEW;
+  end if;
+
+  if OLD.status in ('superseded', 'revoked', 'expired') then
+    raise exception 'terminal memory records are immutable';
+  end if;
+
+  if NEW.memory_id is distinct from OLD.memory_id
+     or NEW.created_at is distinct from OLD.created_at then
+    raise exception 'memory identity and created_at are immutable';
+  end if;
+
+  if OLD.status in ('verified', 'canonical') and (
+       NEW.namespace is distinct from OLD.namespace
+       or NEW.memory_class is distinct from OLD.memory_class
+       or NEW.subject_id is distinct from OLD.subject_id
+       or NEW.content is distinct from OLD.content
+       or NEW.source_refs is distinct from OLD.source_refs
+       or NEW.evidence_level is distinct from OLD.evidence_level
+       or NEW.owner_kind is distinct from OLD.owner_kind
+       or NEW.owner_ref is distinct from OLD.owner_ref
+       or NEW.integrity_hash is distinct from OLD.integrity_hash
+       or NEW.valid_from is distinct from OLD.valid_from
+       or NEW.supersedes is distinct from OLD.supersedes
+     ) then
+    raise exception 'verified and canonical payloads are immutable; create a new candidate instead';
+  end if;
+
+  if NEW.status is distinct from OLD.status and NEW.policy_decision_id is null then
+    raise exception 'memory status transitions require policy_decision_id';
+  end if;
+
+  if not (
+    (OLD.status = 'candidate' and NEW.status in ('candidate', 'verified', 'revoked', 'expired'))
+    or (OLD.status = 'verified' and NEW.status in ('verified', 'canonical', 'revoked', 'expired'))
+    or (OLD.status = 'canonical' and NEW.status in ('canonical', 'superseded', 'revoked', 'expired'))
+  ) then
+    raise exception 'invalid memory status transition: % -> %', OLD.status, NEW.status;
+  end if;
+
+  NEW.updated_at := pg_catalog.now();
+  return NEW;
+end;
+$$;
+revoke all on function lsuperagent.enforce_memory_record_lifecycle() from public, anon, authenticated;
+
+drop trigger if exists memory_records_lifecycle_guard on lsuperagent.memory_records;
+create trigger memory_records_lifecycle_guard
+before insert or update or delete on lsuperagent.memory_records
+for each row execute function lsuperagent.enforce_memory_record_lifecycle();
+
+-- Append an audit event in the same transaction as every accepted insert/update.
+-- This prevents a service-side writer from mutating canonical lifecycle state
+-- without leaving durable evidence.
+create or replace function lsuperagent.audit_memory_record_change()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  audit_action text;
+begin
+  if TG_OP = 'INSERT' then
+    audit_action := 'candidate_created';
+  elsif NEW.status is distinct from OLD.status then
+    audit_action := case NEW.status
+      when 'verified' then 'validated'
+      when 'canonical' then 'canonicalized'
+      when 'superseded' then 'superseded'
+      when 'revoked' then 'revoked'
+      when 'expired' then 'expired'
+      else 'record_updated'
+    end;
+  else
+    audit_action := 'record_updated';
+  end if;
+
+  insert into lsuperagent.memory_audit_events (
+    memory_id,
+    action,
+    actor_kind,
+    actor_ref,
+    policy_decision_id,
+    evidence_refs,
+    event_data
+  ) values (
+    NEW.memory_id,
+    audit_action,
+    'service',
+    current_user,
+    NEW.policy_decision_id,
+    NEW.source_refs,
+    pg_catalog.jsonb_build_object(
+      'from_status', case when TG_OP = 'UPDATE' then OLD.status else null end,
+      'to_status', NEW.status,
+      'integrity_hash', NEW.integrity_hash,
+      'updated_at', NEW.updated_at
+    )
+  );
+
+  return NEW;
+end;
+$$;
+revoke all on function lsuperagent.audit_memory_record_change() from public, anon, authenticated;
+
+drop trigger if exists memory_records_audit_append on lsuperagent.memory_records;
+create trigger memory_records_audit_append
+after insert or update on lsuperagent.memory_records
+for each row execute function lsuperagent.audit_memory_record_change();
+
+-- Prevent silent alteration of evidence history. Audit corrections must be new
+-- events; existing audit rows can never be updated or deleted.
 create or replace function lsuperagent.reject_audit_event_mutation()
 returns trigger
 language plpgsql
