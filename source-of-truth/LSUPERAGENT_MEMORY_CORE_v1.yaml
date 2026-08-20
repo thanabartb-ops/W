@@ -1,7 +1,7 @@
 schema:
   name: LSUPERAGENT_MEMORY_CORE
-  version: 1.1.0
-  status: DATABASE_FOUNDATION_DEPLOYED
+  version: 1.1.1
+  status: DATABASE_FOUNDATION_STAGED
   owner: THANABAT SOMSAK
   canonical_authority: LSUPERAGENT
 
@@ -13,18 +13,24 @@ source_of_truth:
   secrets: Supabase Vault references only
 
 release:
-  approval: RELEASE_APPROVED
+  required_approval: RELEASE_APPROVED
+  deployment_state: NOT_DEPLOYED_FROM_THIS_PR
   production_project: lsuperagent-runtime
   project_ref: ilzjtbfhoxirsuilwmor
-  applied_migration: 20260818200849_lsuperagent_memory_core
-  migration_source_sha: acce8fba75ca4772e05e58ca0148d36f81e0dfcf
-  verified:
-    - private_schema_exists
-    - RLS_enabled_on_memory_tables
-    - anon_and_authenticated_denied
-    - service_role_granted
+  migration_id: 20260818200849_lsuperagent_memory_core
+  migration_source: supabase/migrations/20260818200849_lsuperagent_memory_core.sql
+  migration_source_sha256: 5c04fa958f4538c6cb0426b3afa06edd61bd592b3d62e6cf0b6d27006819f2c3
+  verified_in_pr:
+    - private_schema_declared
+    - RLS_declared_on_memory_tables
+    - anon_and_authenticated_revoked
+    - service_role_delete_not_granted
+    - lifecycle_guard_declared
+    - mutation_audit_trigger_declared
+    - audit_events_append_only_declared
     - public_rls_auto_enable_execute_revoked
-  client_integration: blocked_until_trusted_writer_and_policy_gate_are_deployed
+  production_verification: PENDING_AFTER_APPROVED_APPLY
+  client_integration: blocked_until_trusted_writer_policy_gate_and_production_smoke_checks_pass
 
 hard_rules:
   - No model output, compaction item, or session summary writes canonical memory directly.
@@ -33,6 +39,8 @@ hard_rules:
   - System state, release state, and operational lessons require independent validation.
   - Audit events are append-only; corrections are new events, never silent edits.
   - Client roles have no access to the private memory schema.
+  - Canonical and terminal payloads are immutable; corrections create a new candidate and lifecycle event.
+  - Physical deletion of memory records is prohibited.
 
 memory_lifecycle:
   states:
@@ -47,8 +55,16 @@ memory_lifecycle:
     - attach_source_and_scope
     - policy_and_validator_check
     - canonical_transaction
-    - append_audit_event
+    - append_audit_event_in_same_transaction
     - update_retrieval_index
+  database_enforcement:
+    insert_status: candidate_only
+    status_transition_requires_policy_decision_id: true
+    verified_and_canonical_payloads_immutable: true
+    terminal_records_immutable: true
+    physical_delete_allowed: false
+    updated_at_managed_by_trigger: true
+    accepted_insert_or_update_auto_audited: true
 
 renderer_contract:
   renderer: wforge-image-mcp-wxx
@@ -97,17 +113,22 @@ renderer_contract:
   promotion_rule: only_LSUPERAGENT_validates_and_registers_artifacts
 
 release_guard:
-  database_migration: supabase/migrations/20260818000100_lsuperagent_memory_core.sql
+  database_migration: supabase/migrations/20260818200849_lsuperagent_memory_core.sql
+  migration_sha256: 5c04fa958f4538c6cb0426b3afa06edd61bd592b3d62e6cf0b6d27006819f2c3
   requires:
     - Draft PR review
+    - Memory Core CI PASS on exact migration hash
     - Security advisor re-check after apply
     - Smoke query against private schema
     - Edge Function or trusted server writer before client integration
     - RELEASE_APPROVED for production migration
   security_remediation:
     - Revoke direct EXECUTE from public, anon, and authenticated on public.rls_auto_enable().
+    - Deny physical DELETE on canonical memory records.
+    - Enforce lifecycle transitions and audit coupling in database triggers.
   prohibited:
     - Direct browser access to lsuperagent schema
     - Public SECURITY DEFINER functions for memory writes
     - Raw secret storage in memory records
     - Direct renderer writes to Supabase or canonical memory
+    - Production-deployed status without post-apply evidence
