@@ -1,0 +1,384 @@
+name: LSUPERAGENT R2 Execute
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/lsuperagent-r2-execute.yml
+
+permissions:
+  contents: write
+
+jobs:
+  r2-task2:
+    name: R2 Task 2 executor
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PROJECT: projects/lsuperagent-control-center
+      EVIDENCE_DIR: /tmp/r2-evidence
+
+    steps:
+      - name: Checkout approved feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/lsuperagent-control-center-v1
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frozen dependencies
+        working-directory: projects/lsuperagent-control-center
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare failing R2 tests and safe stubs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          mkdir -p "$PROJECT/src/components" "$PROJECT/src/types" "$PROJECT/src/app/api/health" "$PROJECT/tests/integration"
+
+          cat > "$PROJECT/src/types/connection-status.ts" <<'EOF'
+          export type ConnectionStatus = 'CONNECTED' | 'DEGRADED' | 'NOT_CONNECTED'
+          EOF
+
+          cat > "$PROJECT/src/components/status-badge.tsx" <<'EOF'
+          import type { ConnectionStatus } from '../types/connection-status'
+
+          export function StatusBadge({ status: _status }: { status: ConnectionStatus }) {
+            return <span role="status">UNKNOWN</span>
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/api/health/route.ts" <<'EOF'
+          export async function GET() {
+            return Response.json({ app: 'starting' })
+          }
+          EOF
+
+          cat > "$PROJECT/tests/unit/status-badge.test.tsx" <<'EOF'
+          import { render, screen } from '@testing-library/react'
+          import { describe, expect, it } from 'vitest'
+          import { StatusBadge } from '../../src/components/status-badge'
+
+          describe('StatusBadge', () => {
+            it('renders exact NOT_CONNECTED semantics', () => {
+              render(<StatusBadge status="NOT_CONNECTED" />)
+              expect(screen.getByRole('status')).toHaveTextContent(/^NOT_CONNECTED$/)
+            })
+          })
+          EOF
+
+          cat > "$PROJECT/tests/integration/health-route.test.ts" <<'EOF'
+          // @vitest-environment node
+          import { describe, expect, it } from 'vitest'
+          import { GET } from '../../src/app/api/health/route'
+
+          describe('GET /api/health', () => {
+            it('reports app health without fabricating gateway/backend connectivity', async () => {
+              const response = await GET()
+              const payload = await response.json()
+
+              expect(response.status).toBe(200)
+              expect(payload).toMatchObject({
+                app: 'ok',
+                gateway: 'NOT_CONNECTED',
+                backend: 'NOT_CONNECTED',
+              })
+              expect(payload.requestId).toMatch(/^[0-9a-f-]{36}$/i)
+              expect(Number.isNaN(Date.parse(payload.timestamp))).toBe(false)
+            })
+          })
+          EOF
+
+      - name: Observe RED
+        shell: bash
+        working-directory: projects/lsuperagent-control-center
+        run: |
+          set -uo pipefail
+          set +e
+          pnpm vitest run tests/unit/status-badge.test.tsx tests/integration/health-route.test.ts 2>&1 | tee "$EVIDENCE_DIR/red.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0
+          grep -F 'NOT_CONNECTED' "$EVIDENCE_DIR/red.log" >/dev/null
+          grep -F "'ok'" "$EVIDENCE_DIR/red.log" >/dev/null || grep -F 'ok' "$EVIDENCE_DIR/red.log" >/dev/null
+          printf 'R2 RED observed: status and health contract fail before implementation.\n' | tee "$EVIDENCE_DIR/red-summary.log"
+
+      - name: Implement Task 2 navigation and health contract
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "$PROJECT/src/app/(app)/chat" \
+                   "$PROJECT/src/app/(app)/projects" \
+                   "$PROJECT/src/app/(app)/memory" \
+                   "$PROJECT/src/app/(app)/tools" \
+                   "$PROJECT/src/app/(app)/runtime" \
+                   "$PROJECT/src/app/(app)/audit" \
+                   "$PROJECT/src/components" \
+                   "$PROJECT/src/types" \
+                   "$PROJECT/src/app/api/health"
+
+          cat > "$PROJECT/src/types/connection-status.ts" <<'EOF'
+          export type ConnectionStatus = 'CONNECTED' | 'DEGRADED' | 'NOT_CONNECTED'
+          EOF
+
+          cat > "$PROJECT/src/components/status-badge.tsx" <<'EOF'
+          import type { ConnectionStatus } from '../types/connection-status'
+
+          export function StatusBadge({ status }: { status: ConnectionStatus }) {
+            return (
+              <span className={`status-badge status-${status.toLowerCase()}`} role="status">
+                {status}
+              </span>
+            )
+          }
+          EOF
+
+          cat > "$PROJECT/src/components/app-shell.tsx" <<'EOF'
+          import Link from 'next/link'
+          import type { ReactNode } from 'react'
+          import { StatusBadge } from './status-badge'
+
+          const modules = [
+            ['Chat', '/chat'],
+            ['Projects', '/projects'],
+            ['Memory', '/memory'],
+            ['Tools', '/tools'],
+            ['Runtime', '/runtime'],
+            ['Audit', '/audit'],
+          ] as const
+
+          export function AppShell({ children }: { children: ReactNode }) {
+            return (
+              <div className="app-shell">
+                <aside className="app-sidebar" aria-label="Control Center navigation">
+                  <div className="app-brand">
+                    <span className="eyebrow">LSUPERAGENT</span>
+                    <strong>Control Center</strong>
+                    <StatusBadge status="NOT_CONNECTED" />
+                  </div>
+                  <nav className="module-nav">
+                    {modules.map(([label, href]) => (
+                      <Link key={href} href={href}>{label}</Link>
+                    ))}
+                  </nav>
+                </aside>
+                <main className="app-main">{children}</main>
+              </div>
+            )
+          }
+          EOF
+
+          cat > "$PROJECT/src/components/module-panel.tsx" <<'EOF'
+          import { StatusBadge } from './status-badge'
+
+          export function ModulePanel({ title, description }: { title: string; description: string }) {
+            return (
+              <section className="module-panel">
+                <div>
+                  <p className="eyebrow">MODULE</p>
+                  <h1>{title}</h1>
+                </div>
+                <StatusBadge status="NOT_CONNECTED" />
+                <p className="module-description">{description}</p>
+              </section>
+            )
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/(app)/layout.tsx" <<'EOF'
+          import type { ReactNode } from 'react'
+          import { AppShell } from '../../components/app-shell'
+
+          export default function AppLayout({ children }: { children: ReactNode }) {
+            return <AppShell>{children}</AppShell>
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/(app)/chat/page.tsx" <<'EOF'
+          import { ModulePanel } from '../../../components/module-panel'
+
+          export default function ChatPage() {
+            return <ModulePanel title="Chat" description="Chat gateway wiring begins in R3. No backend connection is claimed in R2." />
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/(app)/projects/page.tsx" <<'EOF'
+          import { ModulePanel } from '../../../components/module-panel'
+
+          export default function ProjectsPage() {
+            return <ModulePanel title="Projects" description="Project state remains read-only and disconnected until an approved gateway path exists." />
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/(app)/memory/page.tsx" <<'EOF'
+          import { ModulePanel } from '../../../components/module-panel'
+
+          export default function MemoryPage() {
+            return <ModulePanel title="Memory" description="Canonical memory access is not connected in R2." />
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/(app)/tools/page.tsx" <<'EOF'
+          import { ModulePanel } from '../../../components/module-panel'
+
+          export default function ToolsPage() {
+            return <ModulePanel title="Tools" description="Tool execution remains deny-by-default and is not connected in R2." />
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/(app)/runtime/page.tsx" <<'EOF'
+          import { ModulePanel } from '../../../components/module-panel'
+
+          export default function RuntimePage() {
+            return <ModulePanel title="Runtime" description="UI health is available through /api/health; gateway and backend remain NOT_CONNECTED." />
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/(app)/audit/page.tsx" <<'EOF'
+          import { ModulePanel } from '../../../components/module-panel'
+
+          export default function AuditPage() {
+            return <ModulePanel title="Audit" description="Canonical audit retrieval is not connected in R2." />
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/api/health/route.ts" <<'EOF'
+          import { randomUUID } from 'node:crypto'
+
+          export async function GET() {
+            return Response.json({
+              app: 'ok',
+              gateway: 'NOT_CONNECTED',
+              backend: 'NOT_CONNECTED',
+              requestId: randomUUID(),
+              timestamp: new Date().toISOString(),
+            })
+          }
+          EOF
+
+          cat > "$PROJECT/src/app/globals.css" <<'EOF'
+          :root {
+            color-scheme: dark;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #0b0d10;
+            color: #f5f7fa;
+          }
+          * { box-sizing: border-box; }
+          html, body { margin: 0; min-height: 100%; }
+          body { min-height: 100vh; background: #0b0d10; }
+          a { color: inherit; text-decoration: none; }
+          .control-center-shell { display: grid; min-height: 100vh; place-items: center; padding: 2rem; }
+          .status-panel, .module-panel { border: 1px solid #303640; border-radius: 1rem; background: #11151a; }
+          .status-panel { width: min(100%, 44rem); padding: 2rem; }
+          .eyebrow, .status-badge { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: .08em; }
+          .eyebrow { margin: 0 0 .75rem; font-size: .8rem; }
+          h1 { margin: 0; font-size: clamp(2rem, 6vw, 4rem); line-height: 1; }
+          .connection-status, .status-badge { display: inline-block; border: 1px solid #4a515d; border-radius: 999px; padding: .5rem .75rem; font-size: .8rem; }
+          .connection-status { margin: 1.5rem 0 0; }
+          .status-note, .module-description { color: #b6bec9; }
+          .status-note { margin: 1rem 0 0; }
+          .app-shell { min-height: 100vh; display: grid; grid-template-columns: minmax(14rem, 18rem) 1fr; }
+          .app-sidebar { border-right: 1px solid #303640; padding: 1.25rem; background: #0f1216; }
+          .app-brand { display: grid; gap: .65rem; margin-bottom: 1.5rem; }
+          .app-brand .status-badge { width: fit-content; }
+          .module-nav { display: grid; gap: .45rem; }
+          .module-nav a { border: 1px solid transparent; border-radius: .65rem; padding: .75rem; color: #d6dbe2; }
+          .module-nav a:hover, .module-nav a:focus-visible { border-color: #3a424d; background: #171c22; }
+          .app-main { display: grid; align-items: start; padding: clamp(1rem, 4vw, 3rem); }
+          .module-panel { width: min(100%, 58rem); padding: clamp(1.25rem, 4vw, 2.5rem); display: grid; gap: 1.25rem; }
+          .module-description { margin: 0; max-width: 48rem; line-height: 1.6; }
+          @media (max-width: 760px) {
+            .app-shell { grid-template-columns: 1fr; }
+            .app-sidebar { border-right: 0; border-bottom: 1px solid #303640; }
+            .module-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .module-nav a { text-align: center; font-size: .9rem; }
+          }
+          @media (max-width: 460px) {
+            .module-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          }
+          EOF
+
+      - name: Implementer self-review
+        shell: bash
+        run: |
+          set -euo pipefail
+          for page in chat projects memory tools runtime audit; do
+            test -f "$PROJECT/src/app/(app)/$page/page.tsx"
+          done
+          test -f "$PROJECT/src/app/api/health/route.ts"
+          test -f "$PROJECT/src/components/app-shell.tsx"
+          test -f "$PROJECT/src/components/status-badge.tsx"
+          test -f "$PROJECT/src/types/connection-status.ts"
+          test -f "$PROJECT/tests/unit/status-badge.test.tsx"
+          test -f "$PROJECT/tests/integration/health-route.test.ts"
+          grep -F "gateway: 'NOT_CONNECTED'" "$PROJECT/src/app/api/health/route.ts" >/dev/null
+          grep -F "backend: 'NOT_CONNECTED'" "$PROJECT/src/app/api/health/route.ts" >/dev/null
+          if grep -E '\b(fetch|createClient|service_role|SUPABASE_SERVICE_ROLE_KEY|OPENAI_API_KEY|VERCEL_TOKEN|GITHUB_TOKEN)\b' "$PROJECT/src/app/api/health/route.ts"; then
+            echo 'R2 health route must not contact or expose privileged upstreams.' >&2
+            exit 1
+          fi
+          if grep -RIE '(SUPABASE_SERVICE_ROLE_KEY|OPENAI_API_KEY|VERCEL_TOKEN|GITHUB_TOKEN|sk-[A-Za-z0-9_-]{12,})' \
+            "$PROJECT/src" "$PROJECT/tests" "$PROJECT/.env.example" "$PROJECT/README.md"; then
+            echo 'Forbidden secret name or token-like value found in R2 source.' >&2
+            exit 1
+          fi
+          git diff --check
+          printf 'R2 self-review passed: scope, six modules, honest health semantics, secret scan.\n' | tee "$EVIDENCE_DIR/self-review.log"
+
+      - name: Verify Vitest
+        shell: bash
+        working-directory: projects/lsuperagent-control-center
+        run: set -o pipefail; pnpm vitest run 2>&1 | tee "$EVIDENCE_DIR/vitest.log"
+
+      - name: Verify lint
+        shell: bash
+        working-directory: projects/lsuperagent-control-center
+        run: set -o pipefail; pnpm lint 2>&1 | tee "$EVIDENCE_DIR/lint.log"
+
+      - name: Verify TypeScript
+        shell: bash
+        working-directory: projects/lsuperagent-control-center
+        run: set -o pipefail; pnpm exec tsc --noEmit 2>&1 | tee "$EVIDENCE_DIR/typecheck.log"
+
+      - name: Verify production build
+        shell: bash
+        working-directory: projects/lsuperagent-control-center
+        run: set -o pipefail; pnpm build 2>&1 | tee "$EVIDENCE_DIR/build.log"
+
+      - name: Commit verified Task 2 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          unexpected="$(git status --porcelain | awk '{print $2}' | grep -v '^projects/lsuperagent-control-center/' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected changed path(s):" >&2
+            echo "$unexpected" >&2
+            exit 1
+          fi
+          git add "$PROJECT"
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(control-center): add navigation shell and health contract'
+          git push origin HEAD:agent/lsuperagent-control-center-v1
+          git rev-parse HEAD | tee "$EVIDENCE_DIR/commit-sha.log"
+
+      - name: Upload R2 Task 2 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lsuperagent-r2-task2-${{ github.run_id }}
+          path: /tmp/r2-evidence
+          if-no-files-found: warn
+          retention-days: 14
