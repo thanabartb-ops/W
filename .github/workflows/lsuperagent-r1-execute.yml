@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 25
     env:
       PROJECT: projects/lsuperagent-control-center
-      EVIDENCE_DIR: ${{ runner.temp }}/r1-evidence
+      EVIDENCE_DIR: /tmp/r1-evidence
 
     steps:
       - name: Checkout approved feature branch
@@ -44,24 +44,16 @@ jobs:
           pnpm dlx create-next-app@latest "$temp_root/app" \
             --ts --tailwind --eslint --app --src-dir --use-pnpm \
             --import-alias '@/*' --yes
-
           mkdir -p "$PROJECT"
-          find "$PROJECT" -mindepth 1 -maxdepth 1 \
-            ! -name README.md ! -name docs -exec rm -rf {} +
-          rsync -a --exclude '.git' --exclude 'node_modules' --exclude '.next' \
-            --exclude 'README.md' "$temp_root/app/" "$PROJECT/"
-
+          find "$PROJECT" -mindepth 1 -maxdepth 1 ! -name README.md ! -name docs -exec rm -rf {} +
+          rsync -a --exclude '.git' --exclude 'node_modules' --exclude '.next' --exclude 'README.md' "$temp_root/app/" "$PROJECT/"
           cd "$PROJECT"
           node <<'NODE'
           const fs = require('node:fs')
           const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'))
           packageJson.name = 'lsuperagent-control-center'
           packageJson.engines = { node: '>=20.9.0' }
-          packageJson.scripts = {
-            ...packageJson.scripts,
-            test: 'vitest',
-            'test:unit': 'vitest run'
-          }
+          packageJson.scripts = { ...packageJson.scripts, test: 'vitest', 'test:unit': 'vitest run' }
           fs.writeFileSync('package.json', `${JSON.stringify(packageJson, null, 2)}\n`)
           NODE
           pnpm add -D vitest @testing-library/react @testing-library/jest-dom jsdom @vitejs/plugin-react
@@ -83,10 +75,7 @@ jobs:
 
           export default defineConfig({
             plugins: [react()],
-            test: {
-              environment: 'jsdom',
-              setupFiles: ['./tests/setup.ts'],
-            },
+            test: { environment: 'jsdom', setupFiles: ['./tests/setup.ts'] },
           })
           EOF
           cat > "$PROJECT/tests/setup.ts" <<'EOF'
@@ -106,7 +95,6 @@ jobs:
               render(<Home />)
               expect(screen.getByText('LSUPERAGENT Control Center')).toBeInTheDocument()
             })
-
             it('shows the disconnected backend status', () => {
               render(<Home />)
               expect(screen.getByText('NOT_CONNECTED')).toBeInTheDocument()
@@ -183,7 +171,6 @@ jobs:
           R1_SOURCE establishes the installable Next.js source foundation only. It does not connect to the canonical LSUPERAGENT/Supabase backend and does not claim backend availability.
 
           ## Stack
-
           - Next.js App Router
           - TypeScript
           - Tailwind CSS
@@ -192,16 +179,13 @@ jobs:
           - Vitest + Testing Library + jsdom
 
           ## Public environment contract
-
           R1 permits only these browser-safe public variable names in `.env.example`:
-
           - `NEXT_PUBLIC_SUPABASE_URL`
           - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
           Do not commit real values or privileged credentials.
 
           ## Commands
-
           ```bash
           pnpm install --frozen-lockfile
           pnpm vitest run
@@ -211,7 +195,6 @@ jobs:
           ```
 
           ## R1 status semantics
-
           The shell intentionally renders `NOT_CONNECTED`. Navigation, `/api/health`, authentication, the Trusted Agent Gateway, canonical Memory/Audit access, Vercel deployment, and domain/DNS work belong to later release gates and are not implemented in R1.
           EOF
 
@@ -229,8 +212,7 @@ jobs:
           test "${env_lines[1]}" = 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY='
           test ! -e "$PROJECT/src/app/api/health/route.ts"
           test ! -d "$PROJECT/src/app/(app)"
-          if grep -RIE '(SUPABASE_SERVICE_ROLE_KEY|OPENAI_API_KEY|VERCEL_TOKEN|GITHUB_TOKEN|sk-[A-Za-z0-9_-]{12,})' \
-            "$PROJECT/src" "$PROJECT/tests" "$PROJECT/.env.example" "$PROJECT/README.md"; then
+          if grep -RIE '(SUPABASE_SERVICE_ROLE_KEY|OPENAI_API_KEY|VERCEL_TOKEN|GITHUB_TOKEN|sk-[A-Za-z0-9_-]{12,})' "$PROJECT/src" "$PROJECT/tests" "$PROJECT/.env.example" "$PROJECT/README.md"; then
             echo 'Forbidden secret name or token-like value found in R1 source.' >&2
             exit 1
           fi
@@ -281,6 +263,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lsuperagent-r1-execution-${{ github.run_id }}
-          path: ${{ runner.temp }}/r1-evidence
+          path: /tmp/r1-evidence
           if-no-files-found: warn
           retention-days: 14
