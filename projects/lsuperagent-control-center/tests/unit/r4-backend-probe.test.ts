@@ -3,20 +3,21 @@ import { probeCanonicalBackend } from '../../src/lib/backend/lsuperagent-runtime
 
 describe('R4 canonical backend probe', () => {
   it('treats the backend as connected when the canonical runtime reports database CONNECTED even if the provider is not ready', async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: false,
-          service: 'lsuperagent-runtime',
-          version: '2026.08.18.1',
-          database: 'CONNECTED',
-          openai: 'NOT_CONNECTED',
-        }),
-        {
-          status: 503,
-          headers: { 'content-type': 'application/json' },
-        },
-      ),
+    const fetchImpl = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            ok: false,
+            service: 'lsuperagent-runtime',
+            version: '2026.08.18.1',
+            database: 'CONNECTED',
+            openai: 'NOT_CONNECTED',
+          }),
+          {
+            status: 503,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
     )
 
     const result = await probeCanonicalBackend({
