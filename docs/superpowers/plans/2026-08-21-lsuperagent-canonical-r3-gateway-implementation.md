@@ -21,6 +21,7 @@
 - Request freshness window is 300 seconds.
 - Actual preview secret injection is deferred to `PRO-R3_CANONICAL_GATEWAY_PREVIEW_APPROVAL_REQUIRED`.
 - Node.js engine floor remains `>=20.9.0`.
+- Existing `.env.example` remains the R1 public two-variable contract; server-only R3 values are injected only at preview configuration time and are not added to that file.
 
 ---
 
@@ -33,7 +34,7 @@
 
 **Interfaces:**
 - Consumes: raw request headers, raw body string, server-only shared secret, current Unix seconds.
-- Produces: `verifyServiceRequest(input): ServiceAuthResult`, `createSignature(input): string`, canonical service caller type.
+- Produces: `verifyServiceRequest(input)`, `createSignature(input)`, canonical service caller types.
 
 - [ ] **Step 1: Write the failing service-auth tests**
 
@@ -57,22 +58,21 @@ describe('gateway service authentication', () => {
 
   it('accepts the allowed client with a fresh valid signature', () => {
     const signature = createSignature(fixture)
-    expect(
-      verifyServiceRequest({
-        clientId: 'lsuperagent-pro',
-        allowedClientId: 'lsuperagent-pro',
-        signature,
-        timestamp: String(fixture.timestamp),
-        requestId: fixture.requestId,
-        body: fixture.body,
-        secret: fixture.secret,
-        nowSeconds: fixture.timestamp + 10,
-      }),
-    ).toEqual({ ok: true, clientId: 'lsuperagent-pro' })
+    expect(verifyServiceRequest({
+      clientId: 'lsuperagent-pro',
+      allowedClientId: 'lsuperagent-pro',
+      signature,
+      timestamp: String(fixture.timestamp),
+      requestId: fixture.requestId,
+      body: fixture.body,
+      secret: fixture.secret,
+      nowSeconds: fixture.timestamp + 10,
+    })).toEqual({ ok: true, clientId: 'lsuperagent-pro' })
   })
 
   it('fails closed for stale, wrong-client, or wrong-signature requests', () => {
     const signature = createSignature(fixture)
+
     expect(verifyServiceRequest({
       clientId: 'other-client', allowedClientId: 'lsuperagent-pro', signature,
       timestamp: String(fixture.timestamp), requestId: fixture.requestId,
@@ -86,9 +86,10 @@ describe('gateway service authentication', () => {
     })).toEqual({ ok: false })
 
     expect(verifyServiceRequest({
-      clientId: 'lsuperagent-pro', allowedClientId: 'lsuperagent-pro', signature: 'v1=' + '0'.repeat(64),
-      timestamp: String(fixture.timestamp), requestId: fixture.requestId,
-      body: fixture.body, secret: fixture.secret, nowSeconds: fixture.timestamp,
+      clientId: 'lsuperagent-pro', allowedClientId: 'lsuperagent-pro',
+      signature: 'v1=' + '0'.repeat(64), timestamp: String(fixture.timestamp),
+      requestId: fixture.requestId, body: fixture.body, secret: fixture.secret,
+      nowSeconds: fixture.timestamp,
     })).toEqual({ ok: false })
   })
 })
@@ -141,7 +142,7 @@ export type PublicGatewayCode =
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 
 const MAX_CLOCK_SKEW_SECONDS = 300
-const SIGNATURE_RE = /^v1=([0-9a-f]{64})$/
+const SIGNATURE_RE = /^v1=[0-9a-f]{64}$/
 
 export function createSignature(input: {
   secret: string
@@ -166,12 +167,10 @@ export function verifyServiceRequest(input: {
 }): { ok: true; clientId: 'lsuperagent-pro' } | { ok: false } {
   if (input.clientId !== 'lsuperagent-pro' || input.clientId !== input.allowedClientId) return { ok: false }
   if (!input.signature || !input.timestamp || !input.requestId || !input.secret) return { ok: false }
+  if (!SIGNATURE_RE.test(input.signature)) return { ok: false }
 
   const timestamp = Number(input.timestamp)
   if (!Number.isInteger(timestamp) || Math.abs(input.nowSeconds - timestamp) > MAX_CLOCK_SKEW_SECONDS) return { ok: false }
-
-  const match = SIGNATURE_RE.exec(input.signature)
-  if (!match) return { ok: false }
 
   const expected = createSignature({
     secret: input.secret,
@@ -214,7 +213,7 @@ git commit -m "feat(lsuperagent): add canonical gateway service auth"
 - Test: `projects/lsuperagent-control-center/tests/unit/gateway-chat-context.test.ts`
 
 **Interfaces:**
-- Consumes: parsed JSON body, verified service caller, request ID.
+- Consumes: parsed JSON body and trusted request ID.
 - Produces: `parseCanonicalChatRequest(input): CanonicalChatRequest`, `buildGatewayContext(input): GatewayContext`.
 
 - [ ] **Step 1: Write failing validation/context tests**
@@ -342,24 +341,96 @@ git commit -m "feat(lsuperagent): normalize canonical chat context"
 
 **Interfaces:**
 - Consumes: HMAC headers, raw request body, `LSUPERAGENT_GATEWAY_SHARED_SECRET`, `LSUPERAGENT_GATEWAY_ALLOWED_CLIENT`.
-- Produces: authenticated canonical gateway response or sanitized 400/403/500 error response.
+- Produces: authenticated gateway handshake or sanitized 400/403/500 response.
 
-- [ ] **Step 1: Write failing route tests**
-
-The tests set server environment variables to deterministic fixture values, sign the exact raw JSON body with `createSignature`, then assert:
+- [ ] **Step 1: Write the failing route tests**
 
 ```ts
-expect(validResponse.status).toBe(503)
-expect(await validResponse.json()).toMatchObject({
-  gateway: 'CONNECTED',
-  execution: 'NOT_CONNECTED',
-  code: 'UPSTREAM_UNAVAILABLE',
+// @vitest-environment node
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createSignature } from '../../src/lib/gateway/service-auth'
+import { POST } from '../../src/app/api/chat/route'
+
+const secretName = 'LSUPERAGENT_GATEWAY_' + 'SHARED_SECRET'
+const clientName = 'LSUPERAGENT_GATEWAY_' + 'ALLOWED_CLIENT'
+const secret = 'unit-test-secret-only'
+
+function signedRequest(body: string, options?: { stale?: boolean; signature?: string }) {
+  const now = Math.floor(Date.now() / 1000)
+  const timestamp = options?.stale ? now - 301 : now
+  const requestId = '11111111-1111-4111-8111-111111111111'
+  const signature = options?.signature ?? createSignature({ secret, timestamp, requestId, body })
+
+  return new Request('http://localhost/api/chat', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-lsuperagent-client': 'lsuperagent-pro',
+      'x-lsuperagent-timestamp': String(timestamp),
+      'x-lsuperagent-request-id': requestId,
+      'x-lsuperagent-signature': signature,
+    },
+    body,
+  })
+}
+
+afterEach(() => vi.unstubAllEnvs())
+
+describe('POST /api/chat canonical gateway', () => {
+  it('authenticates the service request but keeps execution disabled', async () => {
+    vi.stubEnv(secretName, secret)
+    vi.stubEnv(clientName, 'lsuperagent-pro')
+
+    const response = await POST(signedRequest(JSON.stringify({ message: 'hello', workspaceId: 'w1' })))
+    const payload = await response.json()
+
+    expect(response.status).toBe(503)
+    expect(payload).toMatchObject({
+      requestId: '11111111-1111-4111-8111-111111111111',
+      gateway: 'CONNECTED',
+      execution: 'NOT_CONNECTED',
+      code: 'UPSTREAM_UNAVAILABLE',
+    })
+  })
+
+  it('rejects malformed JSON after valid transport authentication', async () => {
+    vi.stubEnv(secretName, secret)
+    vi.stubEnv(clientName, 'lsuperagent-pro')
+    const response = await POST(signedRequest('{not-json'))
+    expect(response.status).toBe(400)
+    expect((await response.json()).code).toBe('INVALID_REQUEST')
+  })
+
+  it('rejects missing, invalid, and stale transport authentication', async () => {
+    vi.stubEnv(secretName, secret)
+    vi.stubEnv(clientName, 'lsuperagent-pro')
+
+    const missing = await POST(new Request('http://localhost/api/chat', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'hello' }),
+    }))
+    expect(missing.status).toBe(403)
+
+    const bad = await POST(signedRequest(JSON.stringify({ message: 'hello' }), { signature: 'v1=' + '0'.repeat(64) }))
+    expect(bad.status).toBe(403)
+
+    const stale = await POST(signedRequest(JSON.stringify({ message: 'hello' }), { stale: true }))
+    expect(stale.status).toBe(403)
+  })
+
+  it('does not leak internal authentication or environment material', async () => {
+    vi.stubEnv(secretName, secret)
+    vi.stubEnv(clientName, 'lsuperagent-pro')
+    const response = await POST(signedRequest(JSON.stringify({ message: 'hello' }), { signature: 'v1=' + '0'.repeat(64) }))
+    const text = (await response.text()).toLowerCase()
+    for (const marker of ['stack', 'signature', secret.toLowerCase(), secretName.toLowerCase()]) {
+      expect(text).not.toContain(marker)
+    }
+  })
 })
 ```
 
-Also assert malformed JSON -> `400 INVALID_REQUEST`, missing/invalid/stale auth -> `403 FORBIDDEN`, and response text excludes stack/env/signature material.
-
-- [ ] **Step 2: Run route test and verify RED**
+- [ ] **Step 2: Run the route test and verify RED**
 
 ```bash
 pnpm vitest run tests/integration/chat-route.test.ts
@@ -389,36 +460,65 @@ export function providerDisabled(requestId: string) {
 }
 ```
 
-- [ ] **Step 4: Implement the canonical route**
-
-Route algorithm:
+- [ ] **Step 4: Implement the complete canonical route**
 
 ```ts
-const serverCorrelationId = randomUUID()
-const rawBody = await request.text()
-const requestIdHeader = request.headers.get('x-lsuperagent-request-id')
-const correlationId = requestIdHeader && UUID_RE.test(requestIdHeader) ? requestIdHeader : serverCorrelationId
+// src/app/api/chat/route.ts
+import { randomUUID } from 'node:crypto'
+import { parseCanonicalChatRequest } from '@/lib/gateway/chat-request'
+import { buildGatewayContext } from '@/lib/gateway/context'
+import { gatewayError, providerDisabled } from '@/lib/gateway/response'
+import { verifyServiceRequest } from '@/lib/gateway/service-auth'
 
-// Read server-only configuration.
-const secret = process.env.LSUPERAGENT_GATEWAY_SHARED_SECRET ?? ''
-const allowedClientId = process.env.LSUPERAGENT_GATEWAY_ALLOWED_CLIENT ?? 'lsuperagent-pro'
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-// Verify HMAC before trusting body/request ID.
-const auth = verifyServiceRequest({ ...headers, body: rawBody, secret, allowedClientId, nowSeconds: Math.floor(Date.now() / 1000) })
-if (!auth.ok) return gatewayError(403, correlationId, 'FORBIDDEN')
+export async function POST(request: Request) {
+  const serverCorrelationId = randomUUID()
 
-// Parse exact raw body once authentication is established.
-let parsed: unknown
-try { parsed = JSON.parse(rawBody) } catch { return gatewayError(400, correlationId, 'INVALID_REQUEST') }
+  try {
+    const rawBody = await request.text()
+    const requestIdHeader = request.headers.get('x-lsuperagent-request-id')
+    const correlationId = requestIdHeader && UUID_RE.test(requestIdHeader)
+      ? requestIdHeader
+      : serverCorrelationId
 
-let chatRequest
-try { chatRequest = parseCanonicalChatRequest(parsed) } catch { return gatewayError(400, correlationId, 'INVALID_REQUEST') }
+    const secret = process.env.LSUPERAGENT_GATEWAY_SHARED_SECRET ?? ''
+    const allowedClientId = process.env.LSUPERAGENT_GATEWAY_ALLOWED_CLIENT ?? 'lsuperagent-pro'
 
-buildGatewayContext({ request: chatRequest, requestId: correlationId })
-return providerDisabled(correlationId)
+    const auth = verifyServiceRequest({
+      clientId: request.headers.get('x-lsuperagent-client'),
+      allowedClientId,
+      signature: request.headers.get('x-lsuperagent-signature'),
+      timestamp: request.headers.get('x-lsuperagent-timestamp'),
+      requestId: requestIdHeader,
+      body: rawBody,
+      secret,
+      nowSeconds: Math.floor(Date.now() / 1000),
+    })
+
+    if (!auth.ok) return gatewayError(403, correlationId, 'FORBIDDEN')
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(rawBody)
+    } catch {
+      return gatewayError(400, correlationId, 'INVALID_REQUEST')
+    }
+
+    let chatRequest
+    try {
+      chatRequest = parseCanonicalChatRequest(parsed)
+    } catch {
+      return gatewayError(400, correlationId, 'INVALID_REQUEST')
+    }
+
+    buildGatewayContext({ request: chatRequest, requestId: correlationId })
+    return providerDisabled(correlationId)
+  } catch {
+    return gatewayError(500, serverCorrelationId, 'INTERNAL_ERROR')
+  }
+}
 ```
-
-Unexpected exceptions return `500 INTERNAL_ERROR` using only the correlation ID. Do not log secret/signature values.
 
 - [ ] **Step 5: Run route + health regression tests**
 
@@ -449,17 +549,49 @@ git commit -m "feat(lsuperagent): add canonical r3 chat gateway"
 
 - [ ] **Step 1: Write the security-boundary test**
 
-Assert with `existsSync` that `src/app/api/health/route.ts` and `src/app/api/chat/route.ts` exist while these paths do not:
+```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest'
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
-```text
-src/app/api/execute/route.ts
-src/app/api/memory/route.ts
-src/app/api/memory/candidate/route.ts
-src/app/api/tools/route.ts
-src/app/api/audit/route.ts
+const disabledRoutes = [
+  'src/app/api/execute/route.ts',
+  'src/app/api/memory/route.ts',
+  'src/app/api/memory/candidate/route.ts',
+  'src/app/api/tools/route.ts',
+  'src/app/api/audit/route.ts',
+]
+
+describe('R3 canonical gateway authority boundary', () => {
+  it('exposes only health and chat server routes for R3', () => {
+    expect(existsSync(resolve(process.cwd(), 'src/app/api/health/route.ts'))).toBe(true)
+    expect(existsSync(resolve(process.cwd(), 'src/app/api/chat/route.ts'))).toBe(true)
+    for (const route of disabledRoutes) expect(existsSync(resolve(process.cwd(), route))).toBe(false)
+  })
+
+  it('does not introduce provider, direct Supabase, or public gateway authority', () => {
+    const sourcePaths = [
+      'src/app/api/chat/route.ts',
+      'src/lib/gateway/service-auth.ts',
+      'src/lib/gateway/chat-request.ts',
+      'src/lib/gateway/context.ts',
+      'src/lib/gateway/response.ts',
+      'src/lib/gateway/types.ts',
+    ]
+    const source = sourcePaths.map((path) => readFileSync(resolve(process.cwd(), path), 'utf8')).join('\n').toLowerCase()
+    const forbidden = [
+      '@supabase/',
+      'openai',
+      'anthropic',
+      'gemini',
+      'next_public_lsuperagent_gateway',
+      'service_' + 'role',
+    ]
+    for (const marker of forbidden) expect(source).not.toContain(marker)
+  })
+})
 ```
-
-Read `src/app/api/chat/route.ts` and `src/lib/gateway/*.ts`; assert the joined source does not contain provider client imports, direct Supabase imports, hard-coded token-like values, or `NEXT_PUBLIC_LSUPERAGENT_GATEWAY` configuration.
 
 - [ ] **Step 2: Run full tests**
 
@@ -469,33 +601,105 @@ pnpm vitest run
 
 Expected: all tests PASS.
 
-- [ ] **Step 3: Add read-only R3 workflow**
-
-Workflow requirements:
+- [ ] **Step 3: Add the exact read-only R3 workflow**
 
 ```yaml
+name: LSUPERAGENT R3 Gateway Verify
+
+on:
+  pull_request:
+    branches:
+      - agent/lsuperagent-control-center-v1
+    paths:
+      - 'projects/lsuperagent-control-center/**'
+      - '.github/workflows/lsuperagent-r3-gateway-verify.yml'
+
 permissions:
   contents: read
+
+jobs:
+  verify:
+    name: R3_GATEWAY verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: projects/lsuperagent-control-center
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: projects/lsuperagent-control-center/pnpm-lock.yaml
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify R3 route boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/app/api/health/route.ts
+          test -f src/app/api/chat/route.ts
+          for route in \
+            src/app/api/execute/route.ts \
+            src/app/api/memory/route.ts \
+            src/app/api/memory/candidate/route.ts \
+            src/app/api/tools/route.ts \
+            src/app/api/audit/route.ts; do
+            test ! -e "$route"
+          done
+
+      - name: Verify provider-disabled source boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RIE '(@supabase/|openai|anthropic|gemini|NEXT_PUBLIC_LSUPERAGENT_GATEWAY)' \
+            src/app/api/chat src/lib/gateway
+
+      - name: Vitest
+        run: pnpm vitest run
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: TypeScript
+        run: pnpm exec tsc --noEmit
+
+      - name: Production build
+        run: pnpm build
 ```
 
-Trigger on PRs to the branch used by the existing LSUPERAGENT Control Center work and paths under `projects/lsuperagent-control-center/**` plus the workflow itself. Steps:
+- [ ] **Step 4: Open a Draft PR to the exact source base**
 
 ```text
-checkout
-pnpm setup v10
-Node 22
-pnpm install --frozen-lockfile
-pnpm vitest run
-pnpm lint
-pnpm exec tsc --noEmit
-pnpm build
+head: agent/r3-canonical-gateway-v1
+base: agent/lsuperagent-control-center-v1
 ```
 
-Add shell checks that `/api/health` and `/api/chat` exist, disabled R4 routes do not exist, and gateway source contains no provider API call/direct Supabase mutation pattern.
+PR body must state:
 
-- [ ] **Step 4: Run local-equivalent verification in GitHub Actions through the PR**
+```text
+Provider execution: disabled
+Canonical Supabase mutation: none
+Vercel deployment: none
+Production/domain/DNS: unchanged
+Next stage after current-head CI: R3B_PRO_ADAPTER_SOURCE
+```
 
-Expected current-head checks:
+- [ ] **Step 5: Verify GitHub Actions on the current PR head**
+
+Expected:
 
 ```text
 Vitest: PASS
@@ -503,13 +707,14 @@ Lint: PASS (warnings may be noted but no errors)
 TypeScript: PASS
 Next.js production build: PASS
 R3 route boundary: PASS
-R3 offline/provider-disabled boundary: PASS
+R3 provider-disabled boundary: PASS
 ```
 
-- [ ] **Step 5: Commit workflow and test**
+- [ ] **Step 6: Commit workflow and test**
 
 ```bash
-git add tests/integration/r3-security-boundary.test.ts ../../.github/workflows/lsuperagent-r3-gateway-verify.yml
+git add tests/integration/r3-security-boundary.test.ts
+git add ../../.github/workflows/lsuperagent-r3-gateway-verify.yml
 git commit -m "ci(lsuperagent): verify canonical r3 gateway boundary"
 ```
 
@@ -518,38 +723,31 @@ git commit -m "ci(lsuperagent): verify canonical r3 gateway boundary"
 ### Task 5: Canonical Source Review Gate
 
 **Files:**
-- No production source changes unless CI exposes a verified defect.
-- PR: branch `agent/r3-canonical-gateway-v1` against the existing Control Center source branch/base selected after confirming repository history.
+- No production source changes unless current-head CI exposes a verified defect.
+- PR: `agent/r3-canonical-gateway-v1` -> `agent/lsuperagent-control-center-v1`.
 
 **Interfaces:**
 - Consumes: current-head source + successful R3 CI.
-- Produces: reviewable canonical R3 source artifact; no deployment.
+- Produces: reviewable canonical R3 source artifact; no merge or deployment.
 
-- [ ] **Step 1: Verify current branch/head and compare against its intended base**
+- [ ] **Step 1: Compare the PR head against `agent/lsuperagent-control-center-v1`**
 
-Confirm no unrelated W//FORGE/runtime files changed.
+Confirm only the R3 spec/plan, canonical gateway source/tests, and R3 verification workflow changed. No unrelated W//FORGE runtime files may be included.
 
-- [ ] **Step 2: Open a Draft PR**
-
-PR body must state explicitly:
-
-```text
-Provider execution: disabled
-Canonical Supabase mutation: none
-Vercel deployment: none
-Production/domain/DNS: unchanged
-Next gate: canonical source verified, then implement PRO adapter source
-```
-
-- [ ] **Step 3: Fetch current-head workflow runs and logs**
+- [ ] **Step 2: Fetch current-head workflow runs and logs**
 
 Do not claim completion from an older SHA.
 
-- [ ] **Step 4: If all current-head checks pass, mark canonical source stage**
+- [ ] **Step 3: If all current-head checks pass, record the canonical source stage**
 
 ```text
 R3A_CANONICAL_SOURCE: VERIFIED
+PROVIDER_EXECUTION: DISABLED
+CANONICAL_DATA_MUTATION: NONE
+DEPLOYMENT: NONE
 NEXT: R3B_PRO_ADAPTER_SOURCE
 ```
 
-Do not merge or deploy at this task.
+- [ ] **Step 4: Do not merge or deploy**
+
+The next source task is the LSUPERAGENT PRO adapter plan/execution. Preview deployment and real secret injection remain blocked until `PRO-R3_CANONICAL_GATEWAY_PREVIEW_APPROVAL_REQUIRED` is explicitly approved.
