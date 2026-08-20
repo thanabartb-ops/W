@@ -5,7 +5,7 @@
 **Scope:** R3_GATEWAY_ONLY  
 **Canonical source:** `thanabartb-ops/W` → `projects/lsuperagent-control-center`  
 **Canonical operational authority:** existing LSUPERAGENT / Supabase  
-**Client:** `thanabartb-ops/Lagensuper-Pro` (`lsuperagent-pro`)  
+**Client:** `thanabartb-ops/Lagensuper-Pro` (`lsuperagent-pro`)
 
 ## 1. Goal
 
@@ -13,14 +13,7 @@ Create the real server-to-server Trusted Agent Gateway boundary for LSUPERAGENT 
 
 This phase proves that LSUPERAGENT PRO can reach and authenticate to the canonical LSUPERAGENT Control Center gateway over a real network boundary while provider/model execution remains disabled.
 
-A successful R3 round-trip proves only:
-
-- the canonical gateway route is reachable;
-- the calling server is authenticated as an approved client;
-- the request contract is valid;
-- request correlation is preserved end-to-end.
-
-It does **not** prove model execution, canonical memory use, audit writes, tool execution, or production readiness.
+A successful R3 round-trip proves only that the canonical gateway route is reachable, the calling server is an approved client, the request contract is valid, and request correlation is preserved end-to-end. It does not prove model execution, canonical memory use, audit writes, tool execution, or production readiness.
 
 ## 2. Existing authority and constraints
 
@@ -34,7 +27,7 @@ The existing Control Center design remains authoritative:
 
 The existing `/api/health` implementation currently reports `gateway: NOT_CONNECTED` and `backend: NOT_CONNECTED`. R3 must not falsify backend/model readiness.
 
-The current Control Center R1 CI requires `.env.example` to contain exactly the two approved public variables. R3 therefore does not add server-only secret names to `.env.example`; server-only variables are documented in this spec and configured only in trusted deployment/runtime settings at the Preview hard gate.
+The current Control Center R1 CI requires `.env.example` to contain exactly the two approved public variables. R3 therefore does not add server-only secret names to `.env.example`; server-only variables are documented here and configured only in trusted deployment/runtime settings at the Preview hard gate.
 
 ## 3. Architecture
 
@@ -67,15 +60,15 @@ No audit write
 No tool execution
 ```
 
-## 4. Why HMAC is used for R3
+## 4. Service authentication choice
 
 Three approaches were considered:
 
-1. **Server-to-server HMAC shared secret — selected.** Smallest implementation, no new identity provider, no browser secret exposure, deterministic tests, and appropriate for a single approved client during R3.
-2. **Supabase user JWT as service authentication — rejected for R3.** User authentication and service authentication solve different problems. R3 must not treat a browser session as authority for the PRO server itself.
-3. **Vercel OIDC / workload identity — deferred.** Stronger long-term service identity but introduces deployment/platform coupling before the basic canonical gateway contract is proven.
+1. **Server-to-server HMAC shared secret — selected.** Smallest implementation, no new identity provider, no browser secret exposure, deterministic tests, and appropriate for one approved non-privileged client during R3.
+2. **Supabase user JWT as service authentication — rejected for R3.** User identity and service identity are separate concerns. R3 must not treat a browser session as authority for the PRO server itself.
+3. **Vercel OIDC / workload identity — deferred.** Stronger long-term service identity but adds deployment/platform coupling before the basic canonical gateway contract is proven.
 
-HMAC is intentionally transitional. Before privileged operations are enabled, service identity may be upgraded without changing the public `/api/chat` request semantics.
+HMAC is transitional. Before privileged operations are enabled, service identity or replay protection must be upgraded as defined in Section 18.
 
 ## 5. Server-only environment contract
 
@@ -88,11 +81,7 @@ LSUPERAGENT_GATEWAY_HMAC_SECRET
 LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS
 ```
 
-`LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS` is a comma-separated allowlist. The first approved value is:
-
-```text
-lsuperagent-pro
-```
+`LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS` is a comma-separated allowlist. The first approved value is `lsuperagent-pro`.
 
 ### LSUPERAGENT PRO
 
@@ -102,23 +91,20 @@ LSUPERAGENT_GATEWAY_CLIENT_ID
 LSUPERAGENT_GATEWAY_HMAC_SECRET
 ```
 
-The first approved client ID is:
-
-```text
-lsuperagent-pro
-```
+The first approved client ID is `lsuperagent-pro`.
 
 Rules:
 
 - no secret value is committed to Git;
 - no server-only variable is exposed to browser code;
 - Preview and Production secrets are isolated;
-- R3 implementation code may reference the variable names but may not contain real values;
-- Production values are not configured in this phase.
+- source may reference variable names but never real values;
+- Production values are not configured in this phase;
+- public `.env.example` contracts remain unchanged during source-only work.
 
 ## 6. Signed request protocol
 
-The PRO server sends these headers to the canonical gateway:
+The PRO server sends:
 
 ```text
 x-lsuperagent-client
@@ -128,8 +114,6 @@ x-lsuperagent-nonce
 x-lsuperagent-signature
 content-type: application/json
 ```
-
-### 6.1 Canonical signing string
 
 Version `v1` signs exactly:
 
@@ -152,29 +136,23 @@ hex(HMAC-SHA256(sharedSecret, signingString))
 
 The gateway compares signatures with a constant-time comparison.
 
-### 6.2 Timestamp freshness
-
-The timestamp is Unix epoch seconds.
-
-The gateway accepts requests only when:
+The timestamp is Unix epoch seconds and is accepted only when:
 
 ```text
 abs(serverTime - requestTime) <= 120 seconds
 ```
 
-Requests outside the window return the same generic authentication failure as a bad signature.
+Missing client, unknown client, missing signature, invalid signature, and stale timestamp all produce the same public authentication failure.
 
-### 6.3 Replay limitation
+### Replay limitation
 
-R3 does not introduce a durable nonce store because canonical data writes are outside this phase. Therefore R3 prevents stale replay but cannot guarantee one-time nonce consumption within the 120-second window across distributed instances.
+R3 does not introduce a durable nonce store because canonical data writes are outside this phase. R3 therefore prevents stale replay but cannot guarantee one-time nonce consumption inside the 120-second window across distributed instances.
 
-This limitation is acceptable only because R3 performs no provider call and no durable/privileged operation.
-
-**Hard requirement before enabling provider, tools, memory mutation, or audit-sensitive privileged execution:** replace this limitation with a durable replay-control mechanism or workload identity that provides equivalent replay protection.
+This limitation is allowed only because R3 performs no provider call and no durable/privileged operation. It becomes a hard blocker before privileged execution.
 
 ## 7. Canonical request contract
 
-After server authentication succeeds, the gateway parses JSON into:
+After service authentication succeeds, JSON is parsed into:
 
 ```ts
 export type CanonicalChatRequest = {
@@ -189,7 +167,7 @@ export type CanonicalChatRequest = {
 
 Validation rules:
 
-- body must be valid JSON object;
+- body must be a valid JSON object;
 - unknown top-level fields are rejected;
 - `requestId` must exactly match `x-lsuperagent-request-id`;
 - `action` must equal `chat`;
@@ -197,9 +175,7 @@ Validation rules:
 - `input` must contain exactly one field: `message`;
 - `message` must be a string;
 - `message.trim().length` must be 1..12000;
-- browser-supplied user IDs, roles, policy decisions, provider names, model names, tool decisions, audit results, and execution claims are rejected.
-
-The canonical gateway builds internal context only after service authentication and request validation succeed.
+- browser-supplied user IDs, roles, policy decisions, provider/model names, tool decisions, audit results, and execution claims are rejected.
 
 ## 8. Internal gateway context
 
@@ -215,13 +191,13 @@ export type CanonicalGatewayContext = {
 }
 ```
 
-`userId` remains `null` in R3. End-user Supabase session verification is not silently invented in this phase.
+`userId` remains `null` in R3. End-user Supabase session verification is not invented in this phase.
 
 ## 9. Response contract
 
-### 9.1 Authenticated valid R3 request
+### Authenticated valid R3 request
 
-Because provider execution is disabled, the canonical gateway returns:
+Because provider execution is disabled:
 
 ```http
 HTTP/1.1 503 Service Unavailable
@@ -230,7 +206,7 @@ Content-Type: application/json
 
 ```json
 {
-  "requestId": "...",
+  "requestId": "generated-or-forwarded-request-id",
   "status": "failed",
   "code": "UPSTREAM_UNAVAILABLE",
   "gateway": "CONNECTED",
@@ -238,41 +214,23 @@ Content-Type: application/json
 }
 ```
 
-Meaning:
+`gateway=CONNECTED` means the request reached the canonical gateway and passed service authentication plus contract validation. `backend=NOT_CONNECTED` means no provider/runtime execution path is enabled. HTTP 503 prevents the client from mistaking a gateway handshake for completed chat execution.
 
-- `gateway=CONNECTED` means the request reached the canonical gateway and passed service authentication + contract validation;
-- `backend=NOT_CONNECTED` means no provider/runtime execution path is enabled;
-- HTTP 503 prevents the client from mistaking a gateway handshake for completed chat execution.
-
-### 9.2 Missing/invalid service authentication
-
-Return:
+### Missing or invalid service authentication
 
 ```text
 HTTP 401
 code: UNAUTHENTICATED
 ```
 
-Do not distinguish publicly between:
-
-- missing client header;
-- unknown client;
-- missing signature;
-- invalid signature;
-- stale timestamp.
-
-### 9.3 Invalid authenticated request
-
-Return:
+### Invalid authenticated request
 
 ```text
 HTTP 400
 code: INVALID_REQUEST
 ```
 
-### 9.4 Gateway configuration missing
-
-If the canonical server lacks the required R3 HMAC configuration, fail closed:
+### Gateway configuration missing
 
 ```text
 HTTP 503
@@ -281,16 +239,14 @@ gateway: BLOCKED
 backend: NOT_CONNECTED
 ```
 
-No request is treated as authenticated when configuration is absent.
+No request is treated as authenticated when required HMAC configuration is absent.
 
 ## 10. PRO client behavior
 
-The existing PRO `/api/chat` remains the browser-facing route.
-
-Its server adapter changes from unconditional PRELIVE `not_connected` to:
+The existing PRO `/api/chat` remains the browser-facing route. Its server adapter changes from unconditional PRELIVE `not_connected` to:
 
 1. normalize the browser request using the existing PRO contract;
-2. create/retain the PRO request ID;
+2. create or retain the PRO request ID;
 3. build the canonical R3 envelope;
 4. sign the exact raw body on the server;
 5. call `${LSUPERAGENT_GATEWAY_URL}/api/chat`;
@@ -298,7 +254,7 @@ Its server adapter changes from unconditional PRELIVE `not_connected` to:
 
 The browser never receives or creates the HMAC secret.
 
-When canonical R3 returns authenticated `503 UPSTREAM_UNAVAILABLE` with `gateway=CONNECTED`, PRO must preserve the failure while exposing the truthful connection state:
+When canonical R3 returns authenticated `503 UPSTREAM_UNAVAILABLE` with `gateway=CONNECTED`, PRO preserves the failure while exposing truthful state:
 
 ```text
 gateway = CONNECTED
@@ -306,18 +262,15 @@ backend = NOT_CONNECTED
 chat execution = FAILED / UPSTREAM_UNAVAILABLE
 ```
 
-PRO must not convert this into a successful assistant response.
+PRO must never convert this into a successful assistant response.
 
 ## 11. Provider execution remains disabled
 
 Forbidden in both R3 source paths:
 
-- OpenAI SDK/API calls;
-- Anthropic SDK/API calls;
-- Gemini SDK/API calls;
+- OpenAI, Anthropic, or Gemini SDK/API calls;
 - provider API key environment variables;
-- model routing;
-- prompt execution;
+- model routing or prompt execution;
 - streaming model responses;
 - tool invocation;
 - canonical memory reads/writes;
@@ -328,65 +281,51 @@ A network request from PRO to the canonical Control Center is the only newly ena
 
 ## 12. Logging and secret handling
 
-Server logs may contain:
+Server logs may contain request ID, route, successfully authenticated client ID, result class, duration, and gateway/backend status class.
 
-- request ID;
-- route;
-- client ID after successful authentication;
-- result class;
-- duration;
-- gateway/backend status class.
+Server logs must not contain the HMAC secret, signature value, authentication-equivalent headers, raw request body, full message text, provider keys, or service-role credentials.
 
-Server logs must not contain:
+Authentication failures log only safe classification and request ID when available.
 
-- HMAC secret;
-- signature value;
-- authorization-equivalent headers;
-- raw request body;
-- full message text;
-- provider keys;
-- service-role credentials.
-
-Authentication failures log only safe classification + request ID when available.
-
-## 13. File boundaries
+## 13. Exact source boundaries
 
 ### Canonical Control Center (`thanabartb-ops/W`)
 
-Planned focused units:
+Create or modify only the R3 gateway surface and its verification files:
 
 ```text
 projects/lsuperagent-control-center/src/lib/gateway/r3-auth.ts
 projects/lsuperagent-control-center/src/lib/gateway/r3-contract.ts
 projects/lsuperagent-control-center/src/lib/gateway/r3-config.ts
 projects/lsuperagent-control-center/src/app/api/chat/route.ts
-projects/lsuperagent-control-center/tests/...R3 tests...
+projects/lsuperagent-control-center/tests/unit/r3-auth.test.ts
+projects/lsuperagent-control-center/tests/unit/r3-contract.test.ts
+projects/lsuperagent-control-center/tests/integration/r3-chat-route.test.ts
+projects/lsuperagent-control-center/tests/integration/r3-source-boundary.test.ts
 .github/workflows/lsuperagent-r3-gateway-verify.yml
 ```
 
-`r3-auth.ts` owns signing-string verification only.  
-`r3-contract.ts` owns strict request parsing/validation only.  
-`r3-config.ts` reads and validates server-only R3 configuration only.  
-`route.ts` orchestrates the boundary and response shaping only.
+`r3-auth.ts` owns signing-string verification only. `r3-contract.ts` owns strict request parsing and validation only. `r3-config.ts` reads and validates server-only R3 configuration only. `route.ts` orchestrates the boundary and response shaping only.
 
 ### LSUPERAGENT PRO (`thanabartb-ops/Lagensuper-Pro`)
 
-Planned focused units:
+Reuse the PRELIVE validation/context and modify only the live gateway client boundary:
 
 ```text
 lsuperagent-pro/lib/gateway/r3-signing.ts
 lsuperagent-pro/lib/gateway/server-dispatch.ts
 lsuperagent-pro/app/api/chat/route.ts
-lsuperagent-pro/tests/...R3 live-gateway contract tests...
+lsuperagent-pro/tests/pro-r3-live-signing.test.ts
+lsuperagent-pro/tests/pro-r3-live-dispatch.test.ts
+lsuperagent-pro/tests/pro-r3-security-boundary.test.ts
+.github/workflows/pro-r3-prelive-verify.yml
 ```
 
 Existing PRELIVE validation/context types are reused rather than duplicated.
 
-## 14. Testing strategy
+## 14. Testing and CI
 
-### 14.1 Canonical unit tests
-
-Must prove:
+### Canonical tests must prove
 
 - exact canonical signing string;
 - valid signature accepted;
@@ -394,35 +333,29 @@ Must prove:
 - unknown client rejected;
 - stale timestamp rejected;
 - request ID/header mismatch rejected;
-- malformed/unknown-field requests rejected;
+- malformed or unknown-field requests rejected;
 - valid authenticated request returns HTTP 503 with `gateway=CONNECTED` and `backend=NOT_CONNECTED`;
 - missing HMAC config fails closed;
-- signature comparison does not use ordinary string equality.
+- signature comparison uses constant-time comparison.
 
-### 14.2 PRO unit tests
+### PRO tests must prove
 
-Must prove:
-
-- signature is created server-side only;
-- request ID is preserved across PRO → canonical gateway;
+- signing is server-side only;
+- request ID is preserved PRO → canonical gateway;
 - canonical authenticated 503 maps to `gateway=CONNECTED`, `backend=NOT_CONNECTED`, `UPSTREAM_UNAVAILABLE`;
-- gateway network error maps to gateway `DEGRADED` or `NOT_CONNECTED` without fabricating success;
+- gateway network failure never fabricates success;
 - no HMAC variable is referenced in browser/client components.
 
-### 14.3 Source boundary tests
-
-Must prove:
+### Source boundary tests must prove
 
 - no provider SDK/call is introduced;
 - no Supabase mutation is introduced;
 - no Memory/Audit/Tools route becomes active;
 - no real secret/token-like value exists in Git;
-- Control Center `.env.example` remains exactly the existing public environment contract;
+- Control Center `.env.example` remains exactly the existing two-variable public contract;
 - PRO public `.env.example` remains unchanged during source-only work.
 
-### 14.4 CI
-
-Both repositories run, at minimum:
+Both repositories run at minimum:
 
 ```text
 pnpm install --frozen-lockfile
@@ -434,7 +367,7 @@ pnpm build
 
 R3 workflows use read-only repository permissions.
 
-## 15. Source implementation sequence
+## 15. Source implementation sequence and merge gate
 
 1. Canonical Control Center HMAC/contract tests RED.
 2. Canonical Control Center minimal gateway implementation GREEN.
@@ -442,25 +375,27 @@ R3 workflows use read-only repository permissions.
 4. PRO signing/transport tests RED.
 5. PRO minimal live-gateway adapter GREEN with mocked upstream only.
 6. PRO R1/R2/R3 regression GREEN.
-7. Both PRs remain unmerged until source verification is complete.
-8. No real URL or secret is configured during source implementation.
+7. Both source branches/PRs remain unmerged after verification.
+8. Source verification does not authorize merge.
+9. Merge requires a separate explicit user approval.
+10. No real gateway URL or HMAC secret is configured during source implementation.
 
 ## 16. Preview hard gate
 
-After both source branches are verified, stop before real network configuration.
+After both source sides are verified, stop before real network configuration.
 
-The next hard gate authorizes all of the following together:
+The next hard gate may authorize all of the following together:
 
-- create/use Vercel Preview projects;
+- create or use Vercel Preview projects;
 - configure Preview-only `LSUPERAGENT_GATEWAY_URL`;
 - configure the same Preview-only HMAC secret on both server projects;
-- configure allowed client ID;
+- configure the allowed client ID;
 - deploy both Preview targets;
 - perform a real signed PRO → canonical gateway round-trip.
 
-That gate does **not** authorize production, provider execution, canonical data writes, domain/DNS changes, or production secrets.
+That gate does not authorize production, provider execution, canonical data writes, domain/DNS changes, or production secrets.
 
-Required next gate name:
+Required next gate:
 
 ```text
 PRO-R3_PREVIEW_NETWORK_APPROVAL_REQUIRED
@@ -471,50 +406,38 @@ PRO-R3_PREVIEW_NETWORK_APPROVAL_REQUIRED
 A real Preview round-trip passes only when all are true:
 
 1. PRO Preview sends a signed request to the canonical Control Center Preview.
-2. Canonical gateway verifies the approved `lsuperagent-pro` client.
+2. Canonical gateway verifies `lsuperagent-pro` as the approved client.
 3. Request ID is identical at both boundaries.
 4. Canonical gateway returns `503 UPSTREAM_UNAVAILABLE`.
 5. Response reports `gateway=CONNECTED` and `backend=NOT_CONNECTED`.
-6. PRO displays/returns a failure state, never a fake assistant answer.
-7. Vercel logs show correlation metadata without message bodies or secrets.
+6. PRO returns a failure state, never a fake assistant answer.
+7. Vercel logs contain correlation metadata without message bodies or secrets.
 8. Provider/model execution remains absent.
 9. Supabase canonical tables remain unchanged by the test.
 10. Production/domain/DNS remain unchanged.
 
-## 18. Explicit non-goals
+## 18. Security limitation before privileged execution
 
-R3 Canonical Gateway does not implement:
+R3 HMAC is approved only for the current non-privileged handshake. Before provider, tools, memory mutation, audit-sensitive privileged work, or any durable action is enabled, the architecture must add one of:
 
-- end-user Supabase Auth verification;
-- provider/model execution;
-- memory retrieval;
-- memory candidate creation;
-- tools;
-- canonical audit writes;
-- production deployment;
-- custom domain attachment;
-- Wix/Cloudflare DNS changes;
-- permanent replay cache.
-
-Those require later explicit gates.
-
-## 19. Security limitations carried forward
-
-The selected R3 HMAC scheme is safe only for the current non-privileged handshake scope. Before any privileged or durable action is enabled, the architecture must add one of:
-
-- durable nonce/replay storage with atomic consumption; or
-- short-lived workload identity with audience binding and replay-resistant verification; or
+- durable nonce/replay storage with atomic consumption;
+- short-lived workload identity with audience binding and replay-resistant verification;
 - another separately reviewed equivalent control.
 
 Provider execution must not be enabled merely because the R3 gateway handshake passes.
 
-## 20. Success state
+## 19. Explicit non-goals
 
-Source-only completion state:
+R3 Canonical Gateway does not implement end-user Supabase Auth verification, provider/model execution, memory retrieval, memory candidate creation, tools, canonical audit writes, production deployment, custom domain attachment, Wix/Cloudflare DNS changes, or permanent replay storage.
+
+Those require later explicit gates.
+
+## 20. Source-only success state
 
 ```text
 R3_CANONICAL_GATEWAY_SOURCE: VERIFIED
 PRO_R3_CLIENT_SOURCE: VERIFIED
+SOURCE_MERGED: NO
 REAL_GATEWAY_URL_CONFIGURED: NO
 REAL_HMAC_SECRET_CONFIGURED: NO
 PROVIDER_CONNECTED: NO
