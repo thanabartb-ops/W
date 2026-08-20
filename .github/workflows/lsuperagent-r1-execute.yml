@@ -1,9 +1,9 @@
 name: LSUPERAGENT R1 Execute
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/lsuperagent-control-center-v1
+      - main
     paths:
       - .github/workflows/lsuperagent-r1-execute.yml
 
