@@ -1,0 +1,112 @@
+project:
+  name: LSUPERAGENT Control Center
+  slug: lsuperagent-control-center
+  version: 1.0.0-design
+  status: DESIGN_STAGED
+  work_type: COMPOSITE
+  target_domain: activity-hub.online
+
+source:
+  repository: thanabartb-ops/W
+  project_path: projects/lsuperagent-control-center
+  branch: agent/lsuperagent-control-center-v1
+  source_authority: GITHUB
+
+operational_authority:
+  system: LSUPERAGENT
+  backend: existing Supabase project
+  rule: do_not_rebuild_or_duplicate_runtime
+
+architecture:
+  frontend: Next.js App Router + TypeScript + Tailwind CSS
+  primary_host: Vercel
+  gateway: Trusted Agent Gateway using server-only routes
+  auth: existing Supabase Auth
+  memory: existing canonical LSUPERAGENT Memory Core
+  audit: existing canonical LSUPERAGENT audit path
+  edge_future: Cloudflare DNS/WAF after stable production
+
+modules:
+  - Chat
+  - Projects
+  - Memory
+  - Tools
+  - Runtime
+  - Audit
+
+public_environment_contract:
+  allowed:
+    - NEXT_PUBLIC_SUPABASE_URL
+    - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  forbidden:
+    - SUPABASE_SERVICE_ROLE_KEY
+    - OPENAI_API_KEY
+    - GITHUB_TOKEN
+    - VERCEL_TOKEN
+    - unrestricted provider credentials
+
+initial_api_contract:
+  - method: GET
+    path: /api/health
+    release: R2_PREVIEW
+  - method: POST
+    path: /api/chat
+    release: R3_GATEWAY
+  - method: GET
+    path: /api/memory
+    release: R4_CANONICAL_DATA
+  - method: POST
+    path: /api/memory/candidate
+    release: R4_CANONICAL_DATA
+  - method: GET
+    path: /api/tools
+    release: R4_CANONICAL_DATA
+  - method: POST
+    path: /api/execute
+    release: R4_CANONICAL_DATA
+  - method: GET
+    path: /api/audit
+    release: R4_CANONICAL_DATA
+
+release_sequence:
+  - R1_SOURCE
+  - R2_PREVIEW
+  - R3_GATEWAY
+  - R4_CANONICAL_DATA
+  - R5_E2E
+  - R6_PRODUCTION
+  - R7_DOMAIN_CUTOVER
+  - R8_EDGE_HARDENING
+
+e2e_contract:
+  - E2E-01_CHAT
+  - E2E-02_AUTHORIZATION
+  - E2E-03_MEMORY
+  - E2E-04_AUDIT
+
+release_guards:
+  production_dns_change: BLOCKED_UNTIL_R6_VERIFIED
+  legacy_mock_runtime_deploy: PROHIBITED
+  duplicate_supabase_project: PROHIBITED
+  duplicate_memory_core: PROHIBITED
+  browser_service_role_secret: PROHIBITED
+  preview_before_production: REQUIRED
+  audit_evidence_for_privileged_action: REQUIRED
+  rollback_evidence_before_domain_cutover: REQUIRED
+
+migration:
+  state: DNS_BASELINE_VERIFIED
+  base44_source_recovery: OPTIONAL
+  old_app_dependency_for_new_build: NONE
+  production_domain_change_authorized: false
+  detailed_sensitive_evidence_location: external_read_only_migration_note
+
+artifacts:
+  design_spec: docs/superpowers/specs/2026-08-20-lsuperagent-control-center-design.md
+  project_readme: projects/lsuperagent-control-center/README.md
+  implementation_plan: NOT_CREATED_UNTIL_SPEC_REVIEW
+
+next_gate:
+  name: SPEC_REVIEW
+  required_result: APPROVED
+  then: WRITE_IMPLEMENTATION_PLAN
