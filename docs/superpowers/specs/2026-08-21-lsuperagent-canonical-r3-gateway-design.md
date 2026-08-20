@@ -7,6 +7,7 @@
 **Canonical authority:** existing LSUPERAGENT / Supabase  
 **Client:** LSUPERAGENT PRO  
 **Release stage:** R3_GATEWAY  
+**Parent design:** `docs/superpowers/specs/2026-08-20-lsuperagent-control-center-design.md`  
 
 ## 1. Goal
 
@@ -62,7 +63,9 @@ R3 uses service-to-service authentication between LSUPERAGENT PRO and the canoni
 
 The PRO server authenticates as the service client `lsuperagent-pro`. This proves which application is calling the gateway; it does not prove an end-user identity and must never be treated as authorization for privileged LSUPERAGENT actions.
 
-End-user Supabase session verification is deferred to the later authentication/canonical-data phase. Until verified user identity exists, privileged execution remains fail-closed.
+The parent Control Center design requires a verified Supabase user session before protected user operations. R3 does not weaken or replace that rule. This R3 route is handshake-only: it validates service transport, normalizes input, and deliberately stops before provider execution, canonical retrieval, tools, memory, or audit mutation. End-user Supabase session verification remains mandatory before any later privileged action can be enabled.
+
+Until verified user identity exists, privileged execution remains fail-closed.
 
 ## 5. HMAC request authentication
 
@@ -158,6 +161,8 @@ export type GatewayContext = {
 
 `userId` is intentionally `null`. A service-authenticated caller is not promoted into a user identity.
 
+For a syntactically valid UUID request header, the canonical gateway preserves the supplied `requestId`. If the request ID header is missing or malformed, the gateway generates a local UUID used only for the fail-closed error response and server correlation; that fallback ID is never treated as proof that transport authentication succeeded.
+
 ## 8. Canonical response contract
 
 A valid signed request proves gateway connectivity but R3 does not execute a model. Therefore the canonical gateway returns:
@@ -174,7 +179,7 @@ A valid signed request proves gateway connectivity but R3 does not execute a mod
 
 with HTTP `503`.
 
-The 503 represents unavailable execution upstream, not gateway failure. PRO determines gateway connectivity from the authenticated, structurally valid canonical response.
+The 503 represents unavailable execution upstream, not gateway failure. PRO may mark the gateway `CONNECTED` only when the request was sent to the configured HTTPS canonical gateway URL and the returned body passes the exact canonical response schema with the matching `requestId`. R3 does not introduce separate response signing.
 
 Authentication failures return fail-closed responses without revealing which secret/header comparison failed.
 
@@ -197,6 +202,8 @@ INTERNAL_ERROR
 - valid authenticated request with provider disabled -> HTTP 503 / `UPSTREAM_UNAVAILABLE` and `gateway: CONNECTED`;
 - unexpected server error -> HTTP 500 / `INTERNAL_ERROR` with request ID only.
 
+Every response includes a correlation `requestId`. Invalid/missing request-ID headers receive a server-generated fallback UUID as defined in section 7.
+
 No response returns raw stack traces, secrets, request signatures, authorization material, environment values, or provider payloads.
 
 ## 10. PRO client behavior
@@ -209,10 +216,10 @@ Behavior:
 2. generate/preserve `requestId`;
 3. serialize the canonical JSON body exactly once;
 4. calculate the HMAC headers server-side;
-5. send the request to `LSUPERAGENT_GATEWAY_URL`;
-6. validate the canonical response structure;
+5. send the request to `LSUPERAGENT_GATEWAY_URL` over HTTPS;
+6. validate the canonical response structure and matching `requestId`;
 7. map a valid canonical `gateway: CONNECTED` response to PRO gateway state `CONNECTED` while keeping model/backend execution `NOT_CONNECTED`;
-8. fail closed on timeout, malformed response, signature/config error, or unreachable gateway.
+8. fail closed on timeout, malformed response, request-ID mismatch, signature/config error, or unreachable gateway.
 
 PRO must never call a provider directly as a fallback.
 
@@ -240,21 +247,23 @@ Canonical tests must prove:
 1. deterministic HMAC generation for a fixed test vector;
 2. timing-safe signature verification succeeds for the correct secret and fails for an incorrect signature;
 3. missing headers, unknown client, and stale timestamp are rejected;
-4. valid JSON is normalized with `caller.kind = service`, `clientId = lsuperagent-pro`, and `userId = null`;
-5. invalid/unknown body fields are rejected;
-6. a valid authenticated request returns HTTP 503 with `gateway: CONNECTED`, `execution: NOT_CONNECTED`, and `UPSTREAM_UNAVAILABLE`;
-7. route source contains no provider SDK execution or direct Supabase mutation;
-8. existing `/api/health` tests continue to pass;
-9. disabled routes remain absent;
-10. lint, TypeScript, and production build pass.
+4. invalid/missing request IDs receive a server-generated correlation UUID without authenticating the caller;
+5. valid JSON is normalized with `caller.kind = service`, `clientId = lsuperagent-pro`, and `userId = null`;
+6. invalid/unknown body fields are rejected;
+7. a valid authenticated request returns HTTP 503 with `gateway: CONNECTED`, `execution: NOT_CONNECTED`, and `UPSTREAM_UNAVAILABLE`;
+8. route source contains no provider SDK execution or direct Supabase mutation;
+9. existing `/api/health` tests continue to pass;
+10. disabled routes remain absent;
+11. lint, TypeScript, and production build pass.
 
 PRO tests must prove:
 
 1. signing uses only server-only configuration;
-2. a valid canonical response maps gateway state to `CONNECTED` without marking model/backend execution complete;
-3. unreachable gateway remains fail-closed;
-4. PRO does not fall back to direct provider or Supabase execution;
-5. prior PRO-R1/R2/R3 regression tests remain green.
+2. a valid canonical response with matching `requestId` maps gateway state to `CONNECTED` without marking model/backend execution complete;
+3. request-ID mismatch fails closed;
+4. unreachable gateway remains fail-closed;
+5. PRO does not fall back to direct provider or Supabase execution;
+6. prior PRO-R1/R2/R3 regression tests remain green.
 
 ## 13. Verification sequence
 
@@ -318,6 +327,7 @@ R3 Gateway is successful when all of the following are true:
 - all canonical and PRO tests/build/security checks pass;
 - secrets remain server-only and absent from Git;
 - no duplicate runtime, memory, audit, or database authority is created;
+- the parent Control Center rule requiring verified user identity for privileged operations remains intact;
 - live preview connectivity is not attempted until separately approved.
 
 ## 17. Next hard gate
