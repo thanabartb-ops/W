@@ -2,8 +2,7 @@ name: LSUPERAGENT R1 Execute
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
     paths:
       - .github/workflows/lsuperagent-r1-execute.yml
 
@@ -15,6 +14,9 @@ jobs:
     name: R1_SOURCE executor
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      PROJECT: projects/lsuperagent-control-center
+      EVIDENCE_DIR: ${{ runner.temp }}/r1-evidence
 
     steps:
       - name: Checkout approved feature branch
@@ -37,32 +39,19 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          mkdir -p "$EVIDENCE_DIR"
           temp_root="$(mktemp -d)"
           pnpm dlx create-next-app@latest "$temp_root/app" \
-            --ts \
-            --tailwind \
-            --eslint \
-            --app \
-            --src-dir \
-            --use-pnpm \
-            --import-alias '@/*' \
-            --yes
+            --ts --tailwind --eslint --app --src-dir --use-pnpm \
+            --import-alias '@/*' --yes
 
-          project="projects/lsuperagent-control-center"
-          mkdir -p "$project"
-          find "$project" -mindepth 1 -maxdepth 1 \
-            ! -name README.md \
-            ! -name docs \
-            -exec rm -rf {} +
+          mkdir -p "$PROJECT"
+          find "$PROJECT" -mindepth 1 -maxdepth 1 \
+            ! -name README.md ! -name docs -exec rm -rf {} +
+          rsync -a --exclude '.git' --exclude 'node_modules' --exclude '.next' \
+            --exclude 'README.md' "$temp_root/app/" "$PROJECT/"
 
-          rsync -a \
-            --exclude '.git' \
-            --exclude 'node_modules' \
-            --exclude '.next' \
-            --exclude 'README.md' \
-            "$temp_root/app/" "$project/"
-
-          cd "$project"
+          cd "$PROJECT"
           node <<'NODE'
           const fs = require('node:fs')
           const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'))
@@ -75,36 +64,20 @@ jobs:
           }
           fs.writeFileSync('package.json', `${JSON.stringify(packageJson, null, 2)}\n`)
           NODE
-
-          pnpm add -D \
-            vitest \
-            @testing-library/react \
-            @testing-library/jest-dom \
-            jsdom \
-            @vitejs/plugin-react
-
-          if ! grep -qxF '!.env.example' .gitignore; then
-            printf '\n!.env.example\n' >> .gitignore
-          fi
+          pnpm add -D vitest @testing-library/react @testing-library/jest-dom jsdom @vitejs/plugin-react
+          grep -qxF '!.env.example' .gitignore || printf '\n!.env.example\n' >> .gitignore
 
       - name: Prepare RED test before feature implementation
         shell: bash
         run: |
           set -euxo pipefail
-          project="projects/lsuperagent-control-center"
-          mkdir -p "$project/tests/unit"
-
-          cat > "$project/src/app/page.tsx" <<'EOF'
+          mkdir -p "$PROJECT/tests/unit"
+          cat > "$PROJECT/src/app/page.tsx" <<'EOF'
           export default function Home() {
-            return (
-              <main>
-                <p>R1 source scaffold</p>
-              </main>
-            )
+            return <main><p>R1 source scaffold</p></main>
           }
           EOF
-
-          cat > "$project/vitest.config.ts" <<'EOF'
+          cat > "$PROJECT/vitest.config.ts" <<'EOF'
           import react from '@vitejs/plugin-react'
           import { defineConfig } from 'vitest/config'
 
@@ -116,19 +89,16 @@ jobs:
             },
           })
           EOF
-
-          cat > "$project/tests/setup.ts" <<'EOF'
+          cat > "$PROJECT/tests/setup.ts" <<'EOF'
           import '@testing-library/jest-dom/vitest'
           import { cleanup } from '@testing-library/react'
           import { afterEach } from 'vitest'
 
           afterEach(() => cleanup())
           EOF
-
-          cat > "$project/tests/unit/shell.test.tsx" <<'EOF'
+          cat > "$PROJECT/tests/unit/shell.test.tsx" <<'EOF'
           import { render, screen } from '@testing-library/react'
           import { describe, expect, it } from 'vitest'
-
           import Home from '../../src/app/page'
 
           describe('R1 shell', () => {
@@ -143,39 +113,30 @@ jobs:
             })
           })
           EOF
-
-          cat > "$project/.env.example" <<'EOF'
+          cat > "$PROJECT/.env.example" <<'EOF'
           NEXT_PUBLIC_SUPABASE_URL=
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
           EOF
 
       - name: Observe RED
-        id: red
         shell: bash
         working-directory: projects/lsuperagent-control-center
         run: |
           set -uo pipefail
           set +e
-          pnpm vitest run tests/unit/shell.test.tsx 2>&1 | tee "$GITHUB_WORKSPACE/r1-red.log"
+          pnpm vitest run tests/unit/shell.test.tsx 2>&1 | tee "$EVIDENCE_DIR/red.log"
           status=${PIPESTATUS[0]}
           set -e
-
-          if [ "$status" -eq 0 ]; then
-            echo 'Expected RED test failure before implementation, but test passed.' >&2
-            exit 1
-          fi
-
-          grep -F 'LSUPERAGENT Control Center' "$GITHUB_WORKSPACE/r1-red.log" >/dev/null
-          grep -F 'NOT_CONNECTED' "$GITHUB_WORKSPACE/r1-red.log" >/dev/null
-          printf 'RED observed with expected missing visible text.\n' | tee "$GITHUB_WORKSPACE/r1-red-summary.log"
+          test "$status" -ne 0
+          grep -F 'LSUPERAGENT Control Center' "$EVIDENCE_DIR/red.log" >/dev/null
+          grep -F 'NOT_CONNECTED' "$EVIDENCE_DIR/red.log" >/dev/null
+          printf 'RED observed with expected missing visible text.\n' | tee "$EVIDENCE_DIR/red-summary.log"
 
       - name: Implement minimum R1 shell
         shell: bash
         run: |
           set -euxo pipefail
-          project="projects/lsuperagent-control-center"
-
-          cat > "$project/src/app/page.tsx" <<'EOF'
+          cat > "$PROJECT/src/app/page.tsx" <<'EOF'
           export default function Home() {
             return (
               <main className="control-center-shell">
@@ -183,19 +144,15 @@ jobs:
                   <p className="eyebrow">R1_SOURCE</p>
                   <h1 id="control-center-title">LSUPERAGENT Control Center</h1>
                   <p className="connection-status" role="status">NOT_CONNECTED</p>
-                  <p className="status-note">
-                    Backend connectivity is intentionally not configured in R1.
-                  </p>
+                  <p className="status-note">Backend connectivity is intentionally not configured in R1.</p>
                 </section>
               </main>
             )
           }
           EOF
-
-          cat > "$project/src/app/layout.tsx" <<'EOF'
+          cat > "$PROJECT/src/app/layout.tsx" <<'EOF'
           import type { Metadata } from 'next'
           import type { ReactNode } from 'react'
-
           import './globals.css'
 
           export const metadata: Metadata = {
@@ -204,85 +161,23 @@ jobs:
           }
 
           export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
-            return (
-              <html lang="en">
-                <body>{children}</body>
-              </html>
-            )
+            return <html lang="en"><body>{children}</body></html>
           }
           EOF
-
-          cat > "$project/src/app/globals.css" <<'EOF'
-          :root {
-            color-scheme: dark;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #0b0d10;
-            color: #f5f7fa;
-          }
-
-          * {
-            box-sizing: border-box;
-          }
-
-          html,
-          body {
-            margin: 0;
-            min-height: 100%;
-          }
-
-          body {
-            min-height: 100vh;
-            background: #0b0d10;
-          }
-
-          .control-center-shell {
-            display: grid;
-            min-height: 100vh;
-            place-items: center;
-            padding: 2rem;
-          }
-
-          .status-panel {
-            width: min(100%, 44rem);
-            border: 1px solid #303640;
-            border-radius: 1rem;
-            padding: 2rem;
-            background: #11151a;
-          }
-
-          .eyebrow,
-          .connection-status {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            letter-spacing: 0.08em;
-          }
-
-          .eyebrow {
-            margin: 0 0 0.75rem;
-            font-size: 0.8rem;
-          }
-
-          h1 {
-            margin: 0;
-            font-size: clamp(2rem, 6vw, 4rem);
-            line-height: 1;
-          }
-
-          .connection-status {
-            display: inline-block;
-            margin: 1.5rem 0 0;
-            border: 1px solid #4a515d;
-            border-radius: 999px;
-            padding: 0.5rem 0.75rem;
-            font-size: 0.85rem;
-          }
-
-          .status-note {
-            margin: 1rem 0 0;
-            color: #b6bec9;
-          }
+          cat > "$PROJECT/src/app/globals.css" <<'EOF'
+          :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; background: #0b0d10; color: #f5f7fa; }
+          * { box-sizing: border-box; }
+          html, body { margin: 0; min-height: 100%; }
+          body { min-height: 100vh; background: #0b0d10; }
+          .control-center-shell { display: grid; min-height: 100vh; place-items: center; padding: 2rem; }
+          .status-panel { width: min(100%, 44rem); border: 1px solid #303640; border-radius: 1rem; padding: 2rem; background: #11151a; }
+          .eyebrow, .connection-status { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: 0.08em; }
+          .eyebrow { margin: 0 0 0.75rem; font-size: 0.8rem; }
+          h1 { margin: 0; font-size: clamp(2rem, 6vw, 4rem); line-height: 1; }
+          .connection-status { display: inline-block; margin: 1.5rem 0 0; border: 1px solid #4a515d; border-radius: 999px; padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+          .status-note { margin: 1rem 0 0; color: #b6bec9; }
           EOF
-
-          cat > "$project/README.md" <<'EOF'
+          cat > "$PROJECT/README.md" <<'EOF'
           # LSUPERAGENT Control Center
 
           R1_SOURCE establishes the installable Next.js source foundation only. It does not connect to the canonical LSUPERAGENT/Supabase backend and does not claim backend availability.
@@ -298,7 +193,7 @@ jobs:
 
           ## Public environment contract
 
-          Copy `.env.example` for local development. R1 permits only these browser-safe public variable names:
+          R1 permits only these browser-safe public variable names in `.env.example`:
 
           - `NEXT_PUBLIC_SUPABASE_URL`
           - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
@@ -324,87 +219,68 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          project="projects/lsuperagent-control-center"
-
-          test -f "$project/package.json"
-          test -f "$project/pnpm-lock.yaml"
-          test -f "$project/tests/unit/shell.test.tsx"
-          test -f "$project/.env.example"
-
-          mapfile -t env_lines < <(grep -v '^[[:space:]]*$' "$project/.env.example")
+          test -f "$PROJECT/package.json"
+          test -f "$PROJECT/pnpm-lock.yaml"
+          test -f "$PROJECT/tests/unit/shell.test.tsx"
+          test -f "$PROJECT/.env.example"
+          mapfile -t env_lines < <(grep -v '^[[:space:]]*$' "$PROJECT/.env.example")
           test "${#env_lines[@]}" -eq 2
           test "${env_lines[0]}" = 'NEXT_PUBLIC_SUPABASE_URL='
           test "${env_lines[1]}" = 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY='
-
-          test ! -e "$project/src/app/api/health/route.ts"
-          test ! -d "$project/src/app/(app)"
-
+          test ! -e "$PROJECT/src/app/api/health/route.ts"
+          test ! -d "$PROJECT/src/app/(app)"
           if grep -RIE '(SUPABASE_SERVICE_ROLE_KEY|OPENAI_API_KEY|VERCEL_TOKEN|GITHUB_TOKEN|sk-[A-Za-z0-9_-]{12,})' \
-            "$project/src" "$project/tests" "$project/.env.example" "$project/README.md"; then
+            "$PROJECT/src" "$PROJECT/tests" "$PROJECT/.env.example" "$PROJECT/README.md"; then
             echo 'Forbidden secret name or token-like value found in R1 source.' >&2
             exit 1
           fi
-
           git diff --check
-          printf 'Self-review: scope, public env contract, secret scan, and diff checks passed.\n' \
-            | tee "$GITHUB_WORKSPACE/r1-self-review.log"
+          printf 'Self-review: scope, public env contract, secret scan, and diff checks passed.\n' | tee "$EVIDENCE_DIR/self-review.log"
 
       - name: Verify Vitest
         shell: bash
         working-directory: projects/lsuperagent-control-center
-        run: |
-          set -o pipefail
-          pnpm vitest run 2>&1 | tee "$GITHUB_WORKSPACE/r1-vitest.log"
+        run: set -o pipefail; pnpm vitest run 2>&1 | tee "$EVIDENCE_DIR/vitest.log"
 
       - name: Verify lint
         shell: bash
         working-directory: projects/lsuperagent-control-center
-        run: |
-          set -o pipefail
-          pnpm lint 2>&1 | tee "$GITHUB_WORKSPACE/r1-lint.log"
+        run: set -o pipefail; pnpm lint 2>&1 | tee "$EVIDENCE_DIR/lint.log"
 
       - name: Verify TypeScript
         shell: bash
         working-directory: projects/lsuperagent-control-center
-        run: |
-          set -o pipefail
-          pnpm exec tsc --noEmit 2>&1 | tee "$GITHUB_WORKSPACE/r1-typecheck.log"
+        run: set -o pipefail; pnpm exec tsc --noEmit 2>&1 | tee "$EVIDENCE_DIR/typecheck.log"
 
       - name: Verify production build
         shell: bash
         working-directory: projects/lsuperagent-control-center
-        run: |
-          set -o pipefail
-          pnpm build 2>&1 | tee "$GITHUB_WORKSPACE/r1-build.log"
+        run: set -o pipefail; pnpm build 2>&1 | tee "$EVIDENCE_DIR/build.log"
 
       - name: Commit verified R1 source
-        id: commit
         shell: bash
         run: |
           set -euxo pipefail
-
           unexpected="$(git status --porcelain | awk '{print $2}' | grep -v '^projects/lsuperagent-control-center/' || true)"
           if [ -n "$unexpected" ]; then
             echo "Unexpected changed path(s):" >&2
             echo "$unexpected" >&2
             exit 1
           fi
-
-          git add -f projects/lsuperagent-control-center/.env.example
-          git add projects/lsuperagent-control-center
+          git add -f "$PROJECT/.env.example"
+          git add "$PROJECT"
           git diff --cached --check
-
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'feat(control-center): scaffold Next.js source foundation'
           git push origin HEAD:agent/lsuperagent-control-center-v1
-          git rev-parse HEAD | tee "$GITHUB_WORKSPACE/r1-commit-sha.log"
+          git rev-parse HEAD | tee "$EVIDENCE_DIR/commit-sha.log"
 
       - name: Upload R1 execution evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lsuperagent-r1-execution-${{ github.run_id }}
-          path: r1-*.log
+          path: ${{ runner.temp }}/r1-evidence
           if-no-files-found: warn
           retention-days: 14
