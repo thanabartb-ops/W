@@ -1,8 +1,8 @@
 project:
   name: LSUPERAGENT Control Center
   slug: lsuperagent-control-center
-  version: 1.0.0-design
-  status: DESIGN_STAGED
+  version: 1.0.0-plan
+  status: PLAN_STAGED
   work_type: COMPOSITE
   target_domain: activity-hub.online
 
@@ -104,9 +104,9 @@ migration:
 artifacts:
   design_spec: docs/superpowers/specs/2026-08-20-lsuperagent-control-center-design.md
   project_readme: projects/lsuperagent-control-center/README.md
-  implementation_plan: NOT_CREATED_UNTIL_SPEC_REVIEW
+  implementation_plan: docs/superpowers/plans/2026-08-20-lsuperagent-control-center-implementation.md
 
 next_gate:
-  name: SPEC_REVIEW
+  name: PLAN_REVIEW
   required_result: APPROVED
-  then: WRITE_IMPLEMENTATION_PLAN
+  then: EXECUTE_R1_SOURCE
