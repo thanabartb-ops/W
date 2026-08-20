@@ -24,10 +24,8 @@ describe('R3 canonical source boundary', () => {
     expect(source).not.toContain('anthropic')
     expect(source).not.toContain('gemini')
     expect(source).not.toContain('@supabase/')
-    expect(source).not.toContain('.from(')
-    expect(source).not.toContain('.insert(')
-    expect(source).not.toContain('.update(')
-    expect(source).not.toContain('.upsert(')
+    expect(source).not.toContain('createclient(')
+    expect(source).not.toMatch(/\bsupabase\s*\./)
   })
 
   it('activates only health and canonical chat API routes', () => {
