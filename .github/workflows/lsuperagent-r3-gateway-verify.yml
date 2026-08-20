@@ -1,0 +1,96 @@
+name: LSUPERAGENT R3 Gateway Verify
+
+on:
+  pull_request:
+    branches:
+      - agent/lsuperagent-control-center-v1
+    paths:
+      - 'projects/lsuperagent-control-center/**'
+      - '.github/workflows/lsuperagent-r3-gateway-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: R3_GATEWAY verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: projects/lsuperagent-control-center
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: projects/lsuperagent-control-center/pnpm-lock.yaml
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify public environment contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t env_lines < <(grep -v '^[[:space:]]*$' .env.example)
+          test "${#env_lines[@]}" -eq 2
+          test "${env_lines[0]}" = 'NEXT_PUBLIC_SUPABASE_URL='
+          test "${env_lines[1]}" = 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY='
+
+      - name: Secret-name scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIE '(SUPABASE_SERVICE_ROLE_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY|VERCEL_TOKEN|GITHUB_TOKEN|sk-[A-Za-z0-9_-]{12,})' \
+            src tests .env.example README.md; then
+            echo 'Forbidden privileged secret name or token-like value found in R3 source.' >&2
+            exit 1
+          fi
+
+      - name: Vitest
+        run: pnpm vitest run
+
+      - name: Verify R3 route boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/app/api/health/route.ts
+          if test -e src/app/api/chat/route.ts; then
+            for route in \
+              src/app/api/execute/route.ts \
+              src/app/api/memory/route.ts \
+              src/app/api/memory/candidate/route.ts \
+              src/app/api/tools/route.ts \
+              src/app/api/audit/route.ts; do
+              test ! -e "$route"
+            done
+          fi
+
+      - name: Verify provider-disabled source boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -d src/lib/gateway; then
+            ! grep -RIE '(@supabase/|openai|anthropic|gemini|NEXT_PUBLIC_LSUPERAGENT_GATEWAY)' \
+              src/app/api/chat src/lib/gateway 2>/dev/null || exit 1
+          fi
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: TypeScript
+        run: pnpm exec tsc --noEmit
+
+      - name: Production build
+        run: pnpm build
