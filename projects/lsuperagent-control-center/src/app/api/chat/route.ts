@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { probeCanonicalBackend } from '../../../lib/backend/lsuperagent-runtime'
 import { verifyR3Authentication } from '../../../lib/gateway/r3-auth'
 import { readR3GatewayConfig } from '../../../lib/gateway/r3-config'
 import { parseCanonicalChatRequest } from '../../../lib/gateway/r3-contract'
@@ -64,6 +65,18 @@ export async function POST(request: Request): Promise<Response> {
       requestId: headerRequestId,
       status: 'failed',
       code: 'INVALID_REQUEST',
+    })
+  }
+
+  const backend = await probeCanonicalBackend()
+  if (backend.status === 'connected') {
+    return failedResponse(503, {
+      requestId: headerRequestId,
+      status: 'failed',
+      code: 'UPSTREAM_UNAVAILABLE',
+      gateway: 'CONNECTED',
+      backend: 'CONNECTED',
+      provider: 'DISABLED',
     })
   }
 
