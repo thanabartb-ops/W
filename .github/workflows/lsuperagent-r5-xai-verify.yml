@@ -1,0 +1,37 @@
+name: LSUPERAGENT R5 xAI Verify
+
+on:
+  push:
+    branches:
+      - agent/lsuperagent-r4-canonical-backend-v1
+  pull_request:
+    paths:
+      - 'projects/lsuperagent-control-center/src/lib/providers/**'
+      - 'projects/lsuperagent-control-center/tests/unit/r5-*.test.ts'
+      - '.github/workflows/lsuperagent-r5-xai-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: R5 xAI provider source verification
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: projects/lsuperagent-control-center
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: projects/lsuperagent-control-center/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run tests/unit/r5-xai-provider.test.ts
+      - run: pnpm lint
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm build
