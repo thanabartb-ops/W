@@ -1,23 +1,22 @@
 # LSUPERAGENT Control Center
 
-R1_SOURCE establishes the installable Next.js source foundation only. It does not connect to the canonical LSUPERAGENT/Supabase backend and does not claim backend availability.
+Canonical app source for the LSUPERAGENT Mobile Web / PWA surface.
 
-## Stack
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- ESLint
-- pnpm
-- Vitest + Testing Library + jsdom
+## Deployment mapping
 
-## Public environment contract
-R1 permits only these browser-safe public variable names in `.env.example`:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- Primary UI host: `lsuperagent-pro-lab`
+- Gateway host: `lsuperagent-r3-gateway-preview` (backend/gateway only)
+- App source root: `projects/lsuperagent-control-center`
+- Canonical backend/runtime authority remains the existing LSUPERAGENT / Supabase stack.
 
-Do not commit real values or privileged credentials.
+## Mobile visual system
 
-## Commands
+The current mobile home implements the approved Matte Black × Pink × Sky Blue visual direction with real safe-area handling, mobile-first layout, dynamic text UI, and no fake device chrome.
+
+## Verification
+
+Required release checks:
+
 ```bash
 pnpm install --frozen-lockfile
 pnpm vitest run
@@ -26,5 +25,4 @@ pnpm exec tsc --noEmit
 pnpm build
 ```
 
-## R1 status semantics
-The shell intentionally renders `NOT_CONNECTED`. Navigation, `/api/health`, authentication, the Trusted Agent Gateway, canonical Memory/Audit access, Vercel deployment, and domain/DNS work belong to later release gates and are not implemented in R1.
+All release checks passed in GitHub Actions run #32 for PR #14 before release promotion.
