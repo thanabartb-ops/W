@@ -1,0 +1,39 @@
+name: LSUPERAGENT R7 Gateway Command Verify
+
+on:
+  push:
+    branches:
+      - agent/lsuperagent-r7-gateway-command-v1
+  pull_request:
+    paths:
+      - 'projects/lsuperagent-control-center/src/app/api/chat/**'
+      - 'projects/lsuperagent-control-center/src/lib/backend/**'
+      - 'projects/lsuperagent-control-center/tests/integration/r7-*.test.ts'
+      - '.github/workflows/lsuperagent-r7-gateway-command-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: R7 gateway command verification
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: projects/lsuperagent-control-center
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: projects/lsuperagent-control-center/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run tests/integration/r7-gateway-command-route.test.ts
+      - run: pnpm vitest run
+      - run: pnpm lint
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm build
