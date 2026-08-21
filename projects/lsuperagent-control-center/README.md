@@ -25,4 +25,4 @@ pnpm exec tsc --noEmit
 pnpm build
 ```
 
-All release checks passed in GitHub Actions run #33 for PR #14 before release promotion.
+All release checks passed in GitHub Actions before release promotion.
