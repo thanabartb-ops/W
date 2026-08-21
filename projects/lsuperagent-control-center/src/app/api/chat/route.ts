@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { executeCanonicalCommand } from '../../../lib/backend/lsuperagent-command'
 import { probeCanonicalBackend } from '../../../lib/backend/lsuperagent-runtime'
 import { verifyR3Authentication } from '../../../lib/gateway/r3-auth'
 import { readR3GatewayConfig } from '../../../lib/gateway/r3-config'
@@ -47,6 +48,16 @@ export async function POST(request: Request): Promise<Response> {
     })
   }
 
+  const authorization = request.headers.get('authorization') ?? ''
+  if (!authorization.startsWith('Bearer ') || authorization.length <= 7) {
+    return failedResponse(401, {
+      requestId: publicRequestId,
+      status: 'failed',
+      code: 'UNAUTHENTICATED',
+    })
+  }
+  const userAuthToken = authorization.slice(7)
+
   let parsedBody: unknown
   try {
     parsedBody = JSON.parse(rawBody)
@@ -58,8 +69,9 @@ export async function POST(request: Request): Promise<Response> {
     })
   }
 
+  let chatRequest
   try {
-    parseCanonicalChatRequest(parsedBody, headerRequestId)
+    chatRequest = parseCanonicalChatRequest(parsedBody, headerRequestId)
   } catch {
     return failedResponse(400, {
       requestId: headerRequestId,
@@ -69,22 +81,65 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const backend = await probeCanonicalBackend()
-  if (backend.status === 'connected') {
+  if (backend.status !== 'connected') {
+    return failedResponse(503, {
+      requestId: headerRequestId,
+      status: 'failed',
+      code: 'UPSTREAM_UNAVAILABLE',
+      gateway: 'CONNECTED',
+      backend: 'NOT_CONNECTED',
+    })
+  }
+
+  const execution = await executeCanonicalCommand({
+    userAuthToken,
+    message: chatRequest.input.message,
+  })
+
+  if (execution.status === 'unauthenticated') {
+    return failedResponse(401, {
+      requestId: headerRequestId,
+      status: 'failed',
+      code: 'UNAUTHENTICATED',
+    })
+  }
+
+  if (execution.status === 'forbidden') {
+    return failedResponse(403, {
+      requestId: headerRequestId,
+      status: 'failed',
+      code: 'FORBIDDEN',
+    })
+  }
+
+  if (execution.status === 'blocked') {
+    return failedResponse(429, {
+      requestId: headerRequestId,
+      status: 'blocked',
+      code: 'POLICY_BLOCKED',
+    })
+  }
+
+  if (execution.status !== 'verified') {
     return failedResponse(503, {
       requestId: headerRequestId,
       status: 'failed',
       code: 'UPSTREAM_UNAVAILABLE',
       gateway: 'CONNECTED',
       backend: 'CONNECTED',
-      provider: 'DISABLED',
+      provider: backend.provider,
     })
   }
 
-  return failedResponse(503, {
-    requestId: headerRequestId,
-    status: 'failed',
-    code: 'UPSTREAM_UNAVAILABLE',
-    gateway: 'CONNECTED',
-    backend: 'NOT_CONNECTED',
-  })
+  return Response.json(
+    {
+      requestId: headerRequestId,
+      status: 'verified',
+      gateway: 'CONNECTED',
+      backend: 'CONNECTED',
+      provider: 'xai',
+      data: execution.data,
+    },
+    { status: 200 },
+  )
 }
