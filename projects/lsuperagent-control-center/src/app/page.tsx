@@ -9,10 +9,10 @@ const shortcuts = [
 
 const nav = [
   { label: 'Home', href: '/', icon: '⌂', active: true },
-  { label: 'Chat', href: '/chat', icon: '◯' },
-  { label: 'Create', href: '/tools', icon: '✧' },
-  { label: 'Agents', href: '/runtime', icon: '◉' },
-  { label: 'Me', href: '/memory', icon: '♙' },
+  { label: 'Chat', href: '/chat', icon: '◯', active: false },
+  { label: 'Create', href: '/tools', icon: '✧', active: false },
+  { label: 'Agents', href: '/runtime', icon: '◉', active: false },
+  { label: 'Me', href: '/memory', icon: '♙', active: false },
 ] as const
 
 export default function Home() {
