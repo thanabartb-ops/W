@@ -7,7 +7,9 @@ on:
   pull_request:
     paths:
       - 'projects/lsuperagent-control-center/src/lib/runtime/**'
+      - 'projects/lsuperagent-control-center/src/lib/backend/lsuperagent-runtime.ts'
       - 'projects/lsuperagent-control-center/tests/unit/r6-*.test.ts'
+      - 'supabase/functions/lsuperagent-runtime/**'
       - '.github/workflows/lsuperagent-r6-xai-runtime-verify.yml'
 
 permissions:
@@ -31,6 +33,17 @@ jobs:
           cache: pnpm
           cache-dependency-path: projects/lsuperagent-control-center/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - name: Verify deployed runtime source boundary
+        run: |
+          RUNTIME='../../supabase/functions/lsuperagent-runtime/index.ts'
+          test -f "$RUNTIME"
+          grep -Fq "https://api.x.ai/v1/responses" "$RUNTIME"
+          grep -Fq "XAI_API_KEY" "$RUNTIME"
+          grep -Fq "const PROVIDER = 'xai'" "$RUNTIME"
+          if grep -Fq "https://api.openai.com" "$RUNTIME"; then
+            echo 'Legacy OpenAI execution endpoint must not exist in R6 runtime source.' >&2
+            exit 1
+          fi
       - run: pnpm vitest run tests/unit/r6-xai-runtime-compiler.test.ts
       - run: pnpm vitest run
       - run: pnpm lint
