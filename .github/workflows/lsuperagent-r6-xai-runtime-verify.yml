@@ -1,0 +1,38 @@
+name: LSUPERAGENT R6 xAI Runtime Verify
+
+on:
+  push:
+    branches:
+      - agent/lsuperagent-r6-xai-runtime-switch-v1
+  pull_request:
+    paths:
+      - 'projects/lsuperagent-control-center/src/lib/runtime/**'
+      - 'projects/lsuperagent-control-center/tests/unit/r6-*.test.ts'
+      - '.github/workflows/lsuperagent-r6-xai-runtime-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: R6 xAI runtime source verification
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: projects/lsuperagent-control-center
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: projects/lsuperagent-control-center/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run tests/unit/r6-xai-runtime-compiler.test.ts
+      - run: pnpm vitest run
+      - run: pnpm lint
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm build
