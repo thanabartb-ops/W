@@ -38,7 +38,7 @@ export default function Home() {
 
         <form className="command-bar" action="/chat" method="get" role="search">
           <span className="command-search" aria-hidden="true">⌕</span>
-          <input name="q" aria-label="Ask LSUPERAGENT" placeholder="Ask LSUPERAGENT anything..." autoComplete="off" />
+          <input type="search" name="q" aria-label="Ask LSUPERAGENT" placeholder="Ask LSUPERAGENT anything..." autoComplete="off" />
           <button type="submit" aria-label="Send to LSUPERAGENT">✦</button>
         </form>
 
