@@ -92,7 +92,12 @@ export async function probeCanonicalBackend(
       status: 'connected',
       service: 'lsuperagent-runtime',
       version: payload.version,
-      provider: typeof payload.openai === 'string' ? payload.openai : 'UNKNOWN',
+      provider:
+        typeof payload.provider === 'string'
+          ? payload.provider
+          : typeof payload.openai === 'string'
+            ? payload.openai
+            : 'UNKNOWN',
       httpStatus: response.status,
     }
   } catch {
