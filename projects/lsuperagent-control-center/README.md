@@ -25,4 +25,4 @@ pnpm exec tsc --noEmit
 pnpm build
 ```
 
-All release checks passed in GitHub Actions before release promotion.
+Release checks must pass in GitHub Actions before release promotion.
