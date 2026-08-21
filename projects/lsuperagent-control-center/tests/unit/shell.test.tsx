@@ -14,7 +14,7 @@ describe('LSUPERAGENT mobile home', () => {
     expect(screen.getByText('Create Image')).toBeInTheDocument()
     expect(screen.getByText('Create Sticker')).toBeInTheDocument()
     expect(screen.getByText('Research')).toBeInTheDocument()
-    expect(screen.getByText('Agents')).toBeInTheDocument()
+    expect(screen.getAllByText('Agents').length).toBeGreaterThanOrEqual(1)
   })
 
   it('keeps the command surface available', () => {
