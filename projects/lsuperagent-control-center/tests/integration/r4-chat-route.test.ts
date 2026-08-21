@@ -38,6 +38,7 @@ function signedRequest() {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
+      authorization: 'Bearer owner-jwt-test-only',
       'x-lsuperagent-client': clientId,
       'x-lsuperagent-request-id': requestId,
       'x-lsuperagent-timestamp': String(timestamp),
@@ -55,8 +56,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('POST /api/chat R4 backend connection', () => {
-  it('reports backend CONNECTED after a read-only canonical runtime health probe while provider execution remains disabled', async () => {
+describe('POST /api/chat canonical backend compatibility', () => {
+  it('preserves backend CONNECTED evidence when xAI command execution fails closed', async () => {
     process.env.LSUPERAGENT_GATEWAY_HMAC_SECRET = secret
     process.env.LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS = clientId
     process.env.LSUPERAGENT_BACKEND_URL =
@@ -64,15 +65,23 @@ describe('POST /api/chat R4 backend connection', () => {
 
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, init?: RequestInit) => {
-        expect(init?.method).toBe('GET')
+        if (init?.method === 'GET') {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              service: 'lsuperagent-runtime',
+              version: '2026.08.21.1',
+              database: 'CONNECTED',
+              provider: 'xai',
+              xai: 'CONFIGURED',
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          )
+        }
+
+        expect(init?.method).toBe('POST')
         return new Response(
-          JSON.stringify({
-            ok: false,
-            service: 'lsuperagent-runtime',
-            version: '2026.08.18.1',
-            database: 'CONNECTED',
-            openai: 'CONFIGURED',
-          }),
+          JSON.stringify({ status: 'FAILED', provider: 'xai' }),
           { status: 503, headers: { 'content-type': 'application/json' } },
         )
       },
@@ -88,8 +97,8 @@ describe('POST /api/chat R4 backend connection', () => {
       code: 'UPSTREAM_UNAVAILABLE',
       gateway: 'CONNECTED',
       backend: 'CONNECTED',
-      provider: 'DISABLED',
+      provider: 'xai',
     })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
