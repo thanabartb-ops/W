@@ -1,0 +1,76 @@
+name: LSUPERAGENT R1 Verify
+
+on:
+  push:
+    branches:
+      - agent/lsuperagent-control-center-v1
+    paths:
+      - projects/lsuperagent-control-center/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - projects/lsuperagent-control-center/**
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: R1_SOURCE verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: projects/lsuperagent-control-center
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: projects/lsuperagent-control-center/pnpm-lock.yaml
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify public environment contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t env_lines < <(grep -v '^[[:space:]]*$' .env.example)
+          test "${#env_lines[@]}" -eq 2
+          test "${env_lines[0]}" = 'NEXT_PUBLIC_SUPABASE_URL='
+          test "${env_lines[1]}" = 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY='
+
+      - name: Secret-name scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIE '(SUPABASE_SERVICE_ROLE_KEY|OPENAI_API_KEY|VERCEL_TOKEN|GITHUB_TOKEN|sk-[A-Za-z0-9_-]{12,})' \
+            src tests .env.example README.md; then
+            echo 'Forbidden secret name or token-like value found in R1 source.' >&2
+            exit 1
+          fi
+
+      - name: Vitest
+        run: pnpm vitest run
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: TypeScript
+        run: pnpm exec tsc --noEmit
+
+      - name: Production build
+        run: pnpm build
