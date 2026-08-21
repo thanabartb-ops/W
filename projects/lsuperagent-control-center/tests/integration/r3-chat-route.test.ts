@@ -37,6 +37,7 @@ function signedRequest(body = canonicalBody()) {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
+      authorization: 'Bearer owner-jwt-test-only',
       'x-lsuperagent-client': clientId,
       'x-lsuperagent-request-id': requestId,
       'x-lsuperagent-timestamp': String(timestamp),
@@ -98,7 +99,7 @@ describe('POST /api/chat canonical R3 boundary', () => {
     })
   })
 
-  it('proves only the authenticated gateway handshake', async () => {
+  it('preserves the authenticated gateway handshake before a backend is configured', async () => {
     enableGatewayConfig()
     const response = await POST(signedRequest())
     expect(response.status).toBe(503)
