@@ -19,6 +19,7 @@ type DisconnectedBackend = {
     | 'INVALID_URL'
     | 'NETWORK_ERROR'
     | 'INVALID_RESPONSE'
+    | 'RUNTIME_UNAVAILABLE'
     | 'DATABASE_UNAVAILABLE'
   httpStatus?: number
 }
@@ -76,6 +77,14 @@ export async function probeCanonicalBackend(
       return {
         status: 'not_connected',
         reason: 'INVALID_RESPONSE',
+        httpStatus: response.status,
+      }
+    }
+
+    if (!response.ok || payload.ok === false) {
+      return {
+        status: 'not_connected',
+        reason: 'RUNTIME_UNAVAILABLE',
         httpStatus: response.status,
       }
     }
