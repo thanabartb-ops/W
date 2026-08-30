@@ -48,7 +48,7 @@ interface GatewayResponse {
 // ---------------------------------------------------------------------------
 
 // @ts-expect-error — module does not exist yet (RED)
-import { handleRuntimeCommand } from "../../src/routes/api/chat";
+import { handleRuntimeCommand } from "../../src/app/api/chat";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -381,7 +381,7 @@ describe("7. Provider not configured", () => {
 describe("8. Health check dependency accuracy", () => {
   it("health endpoint returns not-ready when metric_events table is unavailable", async () => {
     // @ts-expect-error — module does not exist yet (RED)
-    const { handleHealthCheck } = await import("../../src/routes/api/health");
+    const { handleHealthCheck } = await import("../../src/app/api/health");
 
     const res: GatewayResponse = await handleHealthCheck({
       mockMetricEventsUnavailable: true,
@@ -394,7 +394,7 @@ describe("8. Health check dependency accuracy", () => {
 
   it("health endpoint reflects actual provider config readiness", async () => {
     // @ts-expect-error — module does not exist yet (RED)
-    const { handleHealthCheck } = await import("../../src/routes/api/health");
+    const { handleHealthCheck } = await import("../../src/app/api/health");
 
     const res: GatewayResponse = await handleHealthCheck({
       mockProviderMissing: true,
