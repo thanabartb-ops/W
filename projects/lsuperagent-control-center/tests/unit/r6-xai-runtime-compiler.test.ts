@@ -66,7 +66,7 @@ describe('R6 xAI canonical runtime compiler', () => {
 
     expect(result).toEqual({
       provider: 'xai',
-      model: 'grok-build-0.1',
+      model: 'grok-4.6',
       providerRequestId: 'xai_r6_request_123',
       command,
     })
@@ -83,7 +83,7 @@ describe('R6 xAI canonical runtime compiler', () => {
 
     const body = JSON.parse(String(init.body))
     expect(body).toMatchObject({
-      model: 'grok-build-0.1',
+      model: 'grok-4.6',
       store: false,
       max_output_tokens: 1200,
       text: {

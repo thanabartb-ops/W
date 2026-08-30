@@ -1,9 +1,9 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const RUNTIME_VERSION = '2026.08.21.1';
+const RUNTIME_VERSION = '2026.08.30.1';
 const PROVIDER = 'xai';
-const DEFAULT_XAI_MODEL = 'grok-build-0.1';
+const DEFAULT_XAI_MODEL = 'grok-4.6';
 const RATE_LIMIT_PER_MINUTE = 12;
 
 const cors = {

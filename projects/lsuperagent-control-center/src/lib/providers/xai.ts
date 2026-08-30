@@ -59,7 +59,7 @@ export function createXaiProvider(options: XaiProviderOptions = {}) {
   const apiKey = options.apiKey ?? process.env.XAI_API_KEY ?? ''
   if (!apiKey.trim()) throw new Error('XAI_API_KEY_NOT_CONFIGURED')
 
-  const model = options.model ?? process.env.XAI_MODEL ?? 'grok-build-0.1'
+  const model = options.model ?? process.env.XAI_MODEL ?? 'grok-4.6'
   const baseUrl = normalizeBaseUrl(
     options.baseUrl ?? process.env.XAI_BASE_URL ?? 'https://api.x.ai/v1',
   )

@@ -15,7 +15,7 @@ type CompileResult = {
 }
 
 const XAI_RESPONSES_URL = 'https://api.x.ai/v1/responses'
-const DEFAULT_MODEL = 'grok-build-0.1'
+const DEFAULT_MODEL = 'grok-4.6'
 
 const SYSTEM_PROMPT =
   "You are LSUPERAGENT, BANK's single owner agent. LFORGE is the production workflow. Build a deterministic command, never self-approve, use @Approved only for the current BRIEF_PICTURE, use @Rejected to revise, reject historical approval keys, and require evidence for runtime claims."
