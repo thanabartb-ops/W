@@ -21,9 +21,12 @@ function validExecution(payload: unknown): payload is Record<string, unknown> {
   if (!isRecord(payload)) return false
   if (
     payload.status !== 'EXECUTED' ||
-    payload.provider !== 'xai' ||
+    typeof payload.provider !== 'string' ||
+    payload.provider.trim().length === 0 ||
     typeof payload.runtime_version !== 'string' ||
+    payload.runtime_version.trim().length === 0 ||
     typeof payload.model !== 'string' ||
+    payload.model.trim().length === 0 ||
     !isRecord(payload.evidence)
   ) {
     return false
