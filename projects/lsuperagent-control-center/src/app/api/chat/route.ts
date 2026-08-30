@@ -137,7 +137,7 @@ export async function POST(request: Request): Promise<Response> {
       status: 'verified',
       gateway: 'CONNECTED',
       backend: 'CONNECTED',
-      provider: 'xai',
+      provider: execution.data.provider,
       data: execution.data,
     },
     { status: 200 },
