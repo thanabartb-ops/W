@@ -1,0 +1,141 @@
+name: LSUPERAGENT R3 Network E2E
+
+on:
+  push:
+    branches:
+      - agent/lsuperagent-r3-canonical-gateway-v1
+    paths:
+      - '.github/workflows/lsuperagent-r3-network-e2e.yml'
+      - 'projects/lsuperagent-control-center/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/lsuperagent-r3-network-e2e.yml'
+      - 'projects/lsuperagent-control-center/**'
+
+permissions:
+  contents: read
+
+jobs:
+  r3-network-e2e:
+    name: PRO -> TLS -> Canonical Gateway
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout canonical gateway
+        uses: actions/checkout@v4
+      - name: Checkout LSUPERAGENT PRO
+        uses: actions/checkout@v4
+        with:
+          repository: thanabartb-ops/Lagensuper-Pro
+          ref: agent/pro-r3-prelive-gateway-v1
+          path: _pro
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install canonical dependencies
+        working-directory: projects/lsuperagent-control-center
+        run: pnpm install --frozen-lockfile
+      - name: Install PRO dependencies
+        working-directory: _pro/lsuperagent-pro
+        run: pnpm install --frozen-lockfile
+      - name: Build canonical gateway
+        working-directory: projects/lsuperagent-control-center
+        run: pnpm build
+      - name: Build PRO
+        working-directory: _pro/lsuperagent-pro
+        run: pnpm build
+      - name: Generate ephemeral TLS and HMAC material
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/r3-tls"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -keyout "$RUNNER_TEMP/r3-tls/ca.key" -out "$RUNNER_TEMP/r3-tls/ca.crt" -subj "/CN=LSUPERAGENT R3 CI CA" >/dev/null 2>&1
+          openssl req -newkey rsa:2048 -nodes -keyout "$RUNNER_TEMP/r3-tls/server.key" -out "$RUNNER_TEMP/r3-tls/server.csr" -subj "/CN=localhost" >/dev/null 2>&1
+          printf '%s\n' 'subjectAltName=DNS:localhost,IP:127.0.0.1' 'extendedKeyUsage=serverAuth' > "$RUNNER_TEMP/r3-tls/ext.cnf"
+          openssl x509 -req -in "$RUNNER_TEMP/r3-tls/server.csr" -CA "$RUNNER_TEMP/r3-tls/ca.crt" -CAkey "$RUNNER_TEMP/r3-tls/ca.key" -CAcreateserial -days 1 -out "$RUNNER_TEMP/r3-tls/server.crt" -extfile "$RUNNER_TEMP/r3-tls/ext.cnf" >/dev/null 2>&1
+          SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$SECRET"
+          echo "R3_HMAC_SECRET=$SECRET" >> "$GITHUB_ENV"
+          echo "R3_CA_CERT=$RUNNER_TEMP/r3-tls/ca.crt" >> "$GITHUB_ENV"
+          echo "R3_SERVER_CERT=$RUNNER_TEMP/r3-tls/server.crt" >> "$GITHUB_ENV"
+          echo "R3_SERVER_KEY=$RUNNER_TEMP/r3-tls/server.key" >> "$GITHUB_ENV"
+      - name: Start canonical gateway
+        working-directory: projects/lsuperagent-control-center
+        shell: bash
+        run: |
+          set -euo pipefail
+          LSUPERAGENT_GATEWAY_HMAC_SECRET="$R3_HMAC_SECRET" LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS="lsuperagent-pro" pnpm exec next start -p 3001 > "$RUNNER_TEMP/canonical.log" 2>&1 &
+          for i in {1..60}; do
+            curl --fail --silent http://127.0.0.1:3001/api/health >/dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/canonical.log"
+          exit 1
+      - name: Start local TLS reverse proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/r3-tls/proxy.mjs" <<'EOF'
+          import fs from 'node:fs'
+          import http from 'node:http'
+          import https from 'node:https'
+          const cert = fs.readFileSync(process.env.R3_SERVER_CERT)
+          const key = fs.readFileSync(process.env.R3_SERVER_KEY)
+          https.createServer({ cert, key }, (req, res) => {
+            const upstream = http.request({ hostname: '127.0.0.1', port: 3001, path: req.url, method: req.method, headers: req.headers }, (upstreamRes) => {
+              res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers)
+              upstreamRes.pipe(res)
+            })
+            upstream.on('error', () => { res.writeHead(502); res.end() })
+            req.pipe(upstream)
+          }).listen(3443, '127.0.0.1')
+          EOF
+          node "$RUNNER_TEMP/r3-tls/proxy.mjs" > "$RUNNER_TEMP/tls-proxy.log" 2>&1 &
+          for i in {1..30}; do
+            curl --fail --silent --cacert "$R3_CA_CERT" https://localhost:3443/api/health >/dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/tls-proxy.log"
+          exit 1
+      - name: Start PRO with canonical gateway target
+        working-directory: _pro/lsuperagent-pro
+        shell: bash
+        run: |
+          set -euo pipefail
+          NODE_EXTRA_CA_CERTS="$R3_CA_CERT" LSUPERAGENT_GATEWAY_URL="https://localhost:3443" LSUPERAGENT_GATEWAY_CLIENT_ID="lsuperagent-pro" LSUPERAGENT_GATEWAY_HMAC_SECRET="$R3_HMAC_SECRET" pnpm exec next start -p 3002 > "$RUNNER_TEMP/pro.log" 2>&1 &
+          for i in {1..60}; do
+            curl --fail --silent http://127.0.0.1:3002/api/health >/dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/pro.log"
+          exit 1
+      - name: Verify signed HTTPS round trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE_FILE="$RUNNER_TEMP/r3-response.json"
+          STATUS="$(curl --silent --show-error --output "$RESPONSE_FILE" --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"message":"r3-network-e2e"}' http://127.0.0.1:3002/api/chat)"
+          test "$STATUS" = "503"
+          node - "$RESPONSE_FILE" <<'EOF'
+          import fs from 'node:fs'
+          const body = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
+          if (body.code !== 'UPSTREAM_UNAVAILABLE') throw new Error('unexpected code')
+          if (body.gateway !== 'CONNECTED') throw new Error('gateway not connected')
+          if (body.backend !== 'NOT_CONNECTED') throw new Error('backend state drift')
+          if (typeof body.requestId !== 'string' || body.requestId.length < 8) throw new Error('missing requestId')
+          console.log(`R3_NETWORK_E2E_VERIFIED requestId=${body.requestId}`)
+          EOF
+      - name: Show diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo '--- canonical.log ---'; cat "$RUNNER_TEMP/canonical.log" 2>/dev/null || true
+          echo '--- tls-proxy.log ---'; cat "$RUNNER_TEMP/tls-proxy.log" 2>/dev/null || true
+          echo '--- pro.log ---'; cat "$RUNNER_TEMP/pro.log" 2>/dev/null || true
