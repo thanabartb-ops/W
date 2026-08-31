@@ -53,6 +53,7 @@ afterEach(() => {
   delete process.env.LSUPERAGENT_GATEWAY_HMAC_SECRET
   delete process.env.LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS
   delete process.env.LSUPERAGENT_BACKEND_URL
+  delete process.env.RUNTIME_SHARED_SECRET
   vi.unstubAllGlobals()
 })
 
@@ -62,6 +63,7 @@ describe('POST /api/chat canonical backend compatibility', () => {
     process.env.LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS = clientId
     process.env.LSUPERAGENT_BACKEND_URL =
       'https://example.supabase.co/functions/v1/lsuperagent-runtime'
+    process.env.RUNTIME_SHARED_SECRET = 'runtime-shared-secret-for-test-only'
 
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, init?: RequestInit) => {

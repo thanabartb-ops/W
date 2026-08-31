@@ -131,13 +131,16 @@ export async function POST(request: Request): Promise<Response> {
     })
   }
 
+  // Mirror the provider the runtime actually executed on. A hard-coded name
+  // here would misreport every other provider and silently disagree with the
+  // nested execution data that Lagensuper-Pro cross-checks against it.
   return Response.json(
     {
       requestId: headerRequestId,
       status: 'verified',
       gateway: 'CONNECTED',
       backend: 'CONNECTED',
-      provider: 'xai',
+      provider: String(execution.data.provider).trim(),
       data: execution.data,
     },
     { status: 200 },

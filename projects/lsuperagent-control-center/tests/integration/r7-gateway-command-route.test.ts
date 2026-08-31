@@ -10,6 +10,7 @@ const requestId = 'req-route-r7-001'
 const timestamp = Math.floor(Date.now() / 1000)
 const nonce = 'nonce-route-r7-001'
 const ownerToken = 'owner-jwt-for-test-only'
+const runtimeSecret = 'runtime-shared-secret-for-test-only'
 
 function body() {
   return JSON.stringify({
@@ -56,6 +57,7 @@ afterEach(() => {
   delete process.env.LSUPERAGENT_GATEWAY_HMAC_SECRET
   delete process.env.LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS
   delete process.env.LSUPERAGENT_BACKEND_URL
+  delete process.env.RUNTIME_SHARED_SECRET
   vi.unstubAllGlobals()
 })
 
@@ -85,6 +87,7 @@ describe('POST /api/chat R7 authenticated command execution', () => {
     process.env.LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS = clientId
     process.env.LSUPERAGENT_BACKEND_URL =
       'https://example.supabase.co/functions/v1/lsuperagent-runtime'
+    process.env.RUNTIME_SHARED_SECRET = runtimeSecret
 
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === 'GET') {

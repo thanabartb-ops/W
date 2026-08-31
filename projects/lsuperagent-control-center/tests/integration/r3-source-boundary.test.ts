@@ -38,14 +38,24 @@ describe('R3 canonical source boundary', () => {
   })
 
   it('preserves the original two-line public env contract', () => {
-    const envLines = readFileSync(join(root, '.env.example'), 'utf8')
+    const declarations = readFileSync(join(root, '.env.example'), 'utf8')
       .split(/\r?\n/)
-      .filter(Boolean)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
 
-    expect(envLines).toEqual([
+    // The browser-facing contract is the part that must not grow.
+    expect(declarations.filter((line) => line.startsWith('NEXT_PUBLIC_'))).toEqual([
       'NEXT_PUBLIC_SUPABASE_URL=',
       'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=',
     ])
+
+    // Server-only names may be documented, but never with a committed value.
+    expect(declarations).toEqual(
+      expect.arrayContaining(['RUNTIME_SHARED_SECRET=']),
+    )
+    for (const line of declarations) {
+      expect(line).toMatch(/=$/)
+    }
   })
 
   it('contains no token-like committed value in the R3 gateway source', () => {

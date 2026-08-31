@@ -1,6 +1,7 @@
 type CommandExecutionOptions = {
   backendUrl?: string
   userAuthToken: string
+  runtimeSecret?: string
   message: string
   fetchImpl?: typeof fetch
   timeoutMs?: number
@@ -17,13 +18,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && !Array.isArray(value) && typeof value === 'object'
 }
 
+/**
+ * Provider-neutral by contract: any non-empty provider is verifiable so long as
+ * the runtime, model, and evidence identifiers are all present. Pinning this to
+ * one provider name is what kept Claude from executing through the gateway.
+ */
 function validExecution(payload: unknown): payload is Record<string, unknown> {
   if (!isRecord(payload)) return false
   if (
     payload.status !== 'EXECUTED' ||
-    payload.provider !== 'xai' ||
+    typeof payload.provider !== 'string' ||
+    payload.provider.trim().length === 0 ||
     typeof payload.runtime_version !== 'string' ||
+    payload.runtime_version.trim().length === 0 ||
     typeof payload.model !== 'string' ||
+    payload.model.trim().length === 0 ||
     !isRecord(payload.evidence)
   ) {
     return false
@@ -47,6 +56,13 @@ export async function executeCanonicalCommand(
     return { status: 'failed' }
   }
 
+  // Gateway identity is proved separately from the user's identity, and both are
+  // required. Without it the runtime cannot tell this call from a direct one, so
+  // fail closed here rather than let an unidentified request reach the runtime.
+  const runtimeSecret =
+    options.runtimeSecret ?? process.env.RUNTIME_SHARED_SECRET ?? ''
+  if (!runtimeSecret.trim()) return { status: 'failed' }
+
   const rawUrl = options.backendUrl ?? process.env.LSUPERAGENT_BACKEND_URL ?? ''
   let endpoint: string
   try {
@@ -66,6 +82,7 @@ export async function executeCanonicalCommand(
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${options.userAuthToken}`,
+        'x-lsuperagent-runtime-secret': runtimeSecret,
       },
       body: JSON.stringify({ user_request: options.message }),
       cache: 'no-store',
