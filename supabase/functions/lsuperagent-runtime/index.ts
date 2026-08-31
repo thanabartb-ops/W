@@ -1,10 +1,20 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import Anthropic from 'npm:@anthropic-ai/sdk';
 
-const RUNTIME_VERSION = '2026.08.30.1';
-const PROVIDER = 'xai';
+const RUNTIME_VERSION = '2026.08.31.1';
+const DEFAULT_PROVIDER = 'xai';
 const DEFAULT_XAI_MODEL = 'grok-4.6';
+const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5';
+const SUPPORTED_PROVIDERS = ['xai', 'anthropic'] as const;
 const RATE_LIMIT_PER_MINUTE = 12;
+
+type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
+
+function isSupportedProvider(value: unknown): value is SupportedProvider {
+  return typeof value === 'string' &&
+    (SUPPORTED_PROVIDERS as readonly string[]).includes(value);
+}
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -37,6 +47,31 @@ function serverKey(): string {
 
 function resolveXaiKey(): string {
   return Deno.env.get('XAI_API_KEY') || '';
+}
+
+function resolveAnthropicKey(): string {
+  return Deno.env.get('ANTHROPIC_API_KEY') || '';
+}
+
+function providerKey(provider: SupportedProvider): string {
+  return provider === 'anthropic' ? resolveAnthropicKey() : resolveXaiKey();
+}
+
+function runtimeSharedSecret(): string {
+  return Deno.env.get('RUNTIME_SHARED_SECRET') || '';
+}
+
+/**
+ * Compares without leaking the answer through timing. Length is compared first
+ * and is not itself a secret; the byte loop below never exits early.
+ */
+function secureEqual(supplied: string, expected: string): boolean {
+  const a = new TextEncoder().encode(supplied);
+  const b = new TextEncoder().encode(expected);
+  if (a.byteLength !== b.byteLength) return false;
+  let diff = 0;
+  for (let i = 0; i < a.byteLength; i += 1) diff |= a[i] ^ b[i];
+  return diff === 0;
 }
 
 function responseText(payload: Record<string, unknown>): string {
@@ -82,14 +117,20 @@ async function health() {
   const url = Deno.env.get('SUPABASE_URL') || '';
   const key = serverKey();
   const xaiConfigured = Boolean(resolveXaiKey());
+  const anthropicConfigured = Boolean(resolveAnthropicKey());
+  // Ready means at least one provider can actually run, not that a specific
+  // one is present; the caller selects per request.
+  const anyProviderConfigured = xaiConfigured || anthropicConfigured;
   if (!url || !key) {
     return json({
       ok: false,
       service: 'lsuperagent-runtime',
       version: RUNTIME_VERSION,
       database: 'NOT_CONNECTED',
-      provider: PROVIDER,
+      provider: DEFAULT_PROVIDER,
+      providers: SUPPORTED_PROVIDERS,
       xai: xaiConfigured ? 'CONFIGURED' : 'NOT_CONNECTED',
+      anthropic: anthropicConfigured ? 'CONFIGURED' : 'NOT_CONNECTED',
       openai: 'LEGACY_INACTIVE',
     }, 503);
   }
@@ -109,22 +150,26 @@ async function health() {
       service: 'lsuperagent-runtime',
       version: RUNTIME_VERSION,
       database: 'ERROR',
-      provider: PROVIDER,
+      provider: DEFAULT_PROVIDER,
+      providers: SUPPORTED_PROVIDERS,
       xai: xaiConfigured ? 'CONFIGURED' : 'NOT_CONNECTED',
+      anthropic: anthropicConfigured ? 'CONFIGURED' : 'NOT_CONNECTED',
       openai: 'LEGACY_INACTIVE',
       error: 'RUNTIME_RELEASE_LOOKUP_FAILED',
     }, 503);
   }
 
-  const ready = Boolean(data) && data?.state === 'ACTIVE' && xaiConfigured;
+  const ready = Boolean(data) && data?.state === 'ACTIVE' && anyProviderConfigured;
 
   return json({
     ok: ready,
     service: 'lsuperagent-runtime',
     version: RUNTIME_VERSION,
     database: data ? 'CONNECTED' : 'SCHEMA_MISSING',
-    provider: PROVIDER,
+    provider: DEFAULT_PROVIDER,
+    providers: SUPPORTED_PROVIDERS,
     xai: xaiConfigured ? 'CONFIGURED' : 'NOT_CONNECTED',
+    anthropic: anthropicConfigured ? 'CONFIGURED' : 'NOT_CONNECTED',
     openai: 'LEGACY_INACTIVE',
     release: data,
     timestamp: new Date().toISOString(),
@@ -143,8 +188,64 @@ async function authenticatedUser(req: Request, url: string, key: string) {
   return error ? null : data.user;
 }
 
-async function compileCommand(apiKey: string, userRequest: string) {
-  const model = Deno.env.get('XAI_MODEL') || DEFAULT_XAI_MODEL;
+const SYSTEM_PROMPT =
+  'You are LSUPERAGENT, BANK\'s single owner agent. LFORGE is the production workflow. Build a deterministic command, never self-approve, use @Approved only for the current BRIEF_PICTURE, use @Rejected to revise, reject historical approval keys, and require evidence for runtime claims.';
+
+async function compileWithAnthropic(
+  apiKey: string,
+  userRequest: string,
+  requestedModel: string,
+) {
+  const model = requestedModel || Deno.env.get('ANTHROPIC_MODEL') || DEFAULT_ANTHROPIC_MODEL;
+  const started = Date.now();
+  const client = new Anthropic({ apiKey });
+
+  const message = await client.messages.create({
+    model,
+    max_tokens: 16000,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: userRequest }],
+    output_config: {
+      format: { type: 'json_schema', schema: commandSchema },
+    },
+  });
+
+  // Safety classifiers can decline with HTTP 200; content is not usable then.
+  if (message.stop_reason === 'refusal') {
+    throw new Error('ANTHROPIC_REFUSED');
+  }
+
+  let output = '';
+  for (const block of message.content) {
+    if (block.type === 'text') {
+      output = block.text;
+      break;
+    }
+  }
+  if (!output) throw new Error('ANTHROPIC_EMPTY_OUTPUT');
+
+  let command: unknown;
+  try {
+    command = JSON.parse(output);
+  } catch {
+    throw new Error('ANTHROPIC_INVALID_STRUCTURED_OUTPUT');
+  }
+
+  return {
+    provider: 'anthropic' as const,
+    command,
+    model,
+    providerRequestId: message.id || '',
+    durationMs: Date.now() - started,
+  };
+}
+
+async function compileWithXai(
+  apiKey: string,
+  userRequest: string,
+  requestedModel: string,
+) {
+  const model = requestedModel || Deno.env.get('XAI_MODEL') || DEFAULT_XAI_MODEL;
   const started = Date.now();
   const response = await fetch('https://api.x.ai/v1/responses', {
     method: 'POST',
@@ -156,7 +257,7 @@ async function compileCommand(apiKey: string, userRequest: string) {
       input: [
         {
           role: 'system',
-          content: 'You are LSUPERAGENT, BANK\'s single owner agent. LFORGE is the production workflow. Build a deterministic command, never self-approve, use @Approved only for the current BRIEF_PICTURE, use @Rejected to revise, reject historical approval keys, and require evidence for runtime claims.',
+          content: SYSTEM_PROMPT,
         },
         { role: 'user', content: userRequest },
       ],
@@ -198,7 +299,7 @@ async function compileCommand(apiKey: string, userRequest: string) {
   }
 
   return {
-    provider: PROVIDER,
+    provider: 'xai' as const,
     command,
     model,
     providerRequestId: requestId || String(payload.id || ''),
@@ -206,7 +307,33 @@ async function compileCommand(apiKey: string, userRequest: string) {
   };
 }
 
+function compileCommand(
+  provider: SupportedProvider,
+  apiKey: string,
+  userRequest: string,
+  requestedModel: string,
+) {
+  return provider === 'anthropic'
+    ? compileWithAnthropic(apiKey, userRequest, requestedModel)
+    : compileWithXai(apiKey, userRequest, requestedModel);
+}
+
 async function runCommand(req: Request) {
+  // Gateway identity first: before the body is read, before the user JWT is
+  // checked, before any database or provider work. This function is deployed
+  // with verify_jwt=false, so without this check any holder of a valid user
+  // token could call it directly and bypass the trusted gateway entirely.
+  // Ordering it first also keeps unidentified callers off the auth database.
+  const configuredRuntimeSecret = runtimeSharedSecret();
+  if (!configuredRuntimeSecret) {
+    return json({ status: 'FAILED', error: 'RUNTIME_IDENTITY_NOT_CONFIGURED' }, 503);
+  }
+  if (!secureEqual(req.headers.get('x-lsuperagent-runtime-secret') || '', configuredRuntimeSecret)) {
+    // 403, not 401: the caller's own credential is not what failed here, and
+    // the gateway maps 401 to "user session invalid" and signs the user out.
+    return json({ status: 'BLOCKED', error: 'RUNTIME_IDENTITY_REQUIRED' }, 403);
+  }
+
   const url = Deno.env.get('SUPABASE_URL') || '';
   const publicKey = publishableKey();
   const privateKey = serverKey();
@@ -229,6 +356,13 @@ async function runCommand(req: Request) {
   if (!userRequest) return json({ status: 'BLOCKED', error: 'USER_REQUEST_REQUIRED' }, 400);
   if (userRequest.length > 20000) return json({ status: 'BLOCKED', error: 'USER_REQUEST_TOO_LARGE' }, 413);
 
+  // This runtime owns the provider list; the gateway only checks name shape.
+  const provider = body.provider === undefined ? DEFAULT_PROVIDER : body.provider;
+  if (!isSupportedProvider(provider)) {
+    return json({ status: 'BLOCKED', error: 'PROVIDER_NOT_SUPPORTED' }, 400);
+  }
+  const requestedModel = body.model === undefined ? '' : String(body.model).trim();
+
   const since = new Date(Date.now() - 60000).toISOString();
   const { count, error } = await admin
     .from('metric_events')
@@ -242,13 +376,15 @@ async function runCommand(req: Request) {
     return json({ status: 'BLOCKED', error: 'RATE_LIMIT_EXCEEDED', limit: RATE_LIMIT_PER_MINUTE }, 429);
   }
 
-  const apiKey = resolveXaiKey();
-  if (!apiKey) return json({ status: 'FAILED', error: 'XAI_API_KEY_NOT_CONNECTED' }, 503);
+  const apiKey = providerKey(provider);
+  if (!apiKey) {
+    return json({ status: 'FAILED', error: `${provider.toUpperCase()}_API_KEY_NOT_CONNECTED` }, 503);
+  }
 
   const correlationId = crypto.randomUUID();
   try {
-    const compiled = await compileCommand(apiKey, userRequest);
-    if (!compiled.providerRequestId) throw new Error('XAI_REQUEST_ID_MISSING');
+    const compiled = await compileCommand(provider, apiKey, userRequest, requestedModel);
+    if (!compiled.providerRequestId) throw new Error('PROVIDER_REQUEST_ID_MISSING');
 
     const { data: runtime, error } = await admin.rpc('lsuperagent_start_run', {
       p_user_id: user.id,
@@ -265,7 +401,9 @@ async function runCommand(req: Request) {
       throw new Error(`RUNTIME_CHAIN_${runtime?.status || 'FAILED'}:${runtime?.reason || runtime?.error || 'unknown'}`);
     }
 
-    await admin.from('metric_events').insert({
+    // The success metric is the evidence this run happened. Returning EXECUTED
+    // without it would report a verified execution that nothing recorded.
+    const { error: metricInsertError } = await admin.from('metric_events').insert({
       workspace_id: runtime.workspace_id,
       actor_id: user.id,
       event_name: 'lsuperagent_runtime_request',
@@ -273,16 +411,25 @@ async function runCommand(req: Request) {
       correlation_id: runtime.correlation_id,
       dimensions: {
         status: 'success',
-        provider: PROVIDER,
+        provider: compiled.provider,
         model: compiled.model,
         runtime_version: RUNTIME_VERSION,
       },
     });
 
+    if (metricInsertError) {
+      return json({
+        status: 'FAILED',
+        correlation_id: runtime.correlation_id,
+        provider: compiled.provider,
+        error: 'METRIC_PERSIST_FAILED',
+      }, 500);
+    }
+
     return json({
       status: 'EXECUTED',
       runtime_version: RUNTIME_VERSION,
-      provider: PROVIDER,
+      provider: compiled.provider,
       model: compiled.model,
       command: compiled.command,
       evidence: {
@@ -294,7 +441,7 @@ async function runCommand(req: Request) {
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    return json({ status: 'FAILED', correlation_id: correlationId, provider: PROVIDER, error: detail }, detail.includes('NOT_CONNECTED') ? 503 : 502);
+    return json({ status: 'FAILED', correlation_id: correlationId, provider, error: detail }, detail.includes('NOT_CONNECTED') ? 503 : 502);
   }
 }
 
