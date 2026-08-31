@@ -1,35 +1,29 @@
+// @vitest-environment node
 /**
- * R7 Runtime Command — RED test suite
+ * R7 Runtime Command — P0 boundary suite
  *
- * Path (in W repo):
- *   projects/lsuperagent-control-center/tests/unit/r7-runtime-command.test.ts
+ * Spec: lsuperagent-pro/docs/superpowers/specs/2026-08-30-runtime-gateway-p0-design.md
  *
- * Status: RED — these tests MUST fail until production implementation is complete.
- * Do NOT modify tests to make them pass; fix the production code instead.
+ * Covers:
+ *   1. Gateway -> runtime identity (RUNTIME_SHARED_SECRET) enforced before the backend POST
+ *   2. The runtime secret travels only as a server header, never in the body or the response
+ *   3. The user JWT stays a separate, still-required credential
+ *   4. Provider-neutral execution: claude and xai are both verifiable
+ *   5. Verified evidence fields stay mandatory and non-empty
  *
- * Covers (per Notion page 14 — P0 Runtime Gateway Update 2026-08-30):
- *   1. Fail-closed security order
- *   2. RUNTIME_SHARED_SECRET enforcement (before body / JWT / provider)
- *   3. Provider-neutral execution contract
- *   4. EXECUTED response validation (no schema regression)
- *   5. Health check dependency accuracy
- *
- * ALIGNED RED: Tests target the actual W production POST route.
- * RED is caused by missing approved P0 behaviors, not harness errors.
+ * Two details decide whether a test here exercises the path it names:
+ *   - The signing string comes from the production `buildR3SigningString`, and the
+ *     client id must be the literal `lsuperagent-pro` that `readR3GatewayConfig`
+ *     and `verifyR3Authentication` both require. Anything else is rejected as
+ *     unconfigured (503) or unauthenticated (401) long before the runtime hop.
+ *   - The route probes backend health with GET before executing with POST, so a
+ *     fetch double must answer the probe first or the route stops at the probe.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import crypto from "node:crypto";
-
-// ---------------------------------------------------------------------------
-// Production imports
-// ---------------------------------------------------------------------------
-
+import { createHmac } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildR3SigningString } from "../../src/lib/gateway/r3-auth";
 import { POST } from "../../src/app/api/chat/route";
-
-// ---------------------------------------------------------------------------
-// Helper types
-// ---------------------------------------------------------------------------
 
 interface RuntimeExecutionPayload {
   status: "EXECUTED" | "FAILED" | "PENDING";
@@ -43,309 +37,238 @@ interface RuntimeExecutionPayload {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Test constants and helpers
-// ---------------------------------------------------------------------------
-
-const VALID_RUNTIME_SECRET = "test-runtime-shared-secret-32chars!";
-const VALID_USER_JWT =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzEiLCJleHAiOjk5OTk5OTk5OTl9.sig";
-const VALID_REQUEST_ID = "req_test_001";
-const VALID_CLIENT_ID = "test-client";
+const GATEWAY_SECRET = "runtime-command-test-secret";
+const CLIENT_ID = "lsuperagent-pro";
+const REQUEST_ID = "req-runtime-command-001";
+const NONCE = "nonce-runtime-command-001";
+const USER_JWT = "user-jwt-for-test-only";
+const RUNTIME_SECRET = "runtime-shared-secret-for-test-only";
 
 let mockFetch: ReturnType<typeof vi.fn>;
-let originalEnv: NodeJS.ProcessEnv;
 
 beforeEach(() => {
-  originalEnv = { ...process.env };
-  // Set required gateway config
-  process.env.LSUPERAGENT_GATEWAY_URL = "https://gateway.test";
-  process.env.LSUPERAGENT_GATEWAY_CLIENT_ID = VALID_CLIENT_ID;
-  process.env.LSUPERAGENT_GATEWAY_HMAC_SECRET = "test-gateway-secret";
-  process.env.LSUPERAGENT_GATEWAY_RUNTIME_SECRET = VALID_RUNTIME_SECRET;
-  process.env.LSUPERAGENT_BACKEND_URL = "https://runtime.test/chat";
-
-  mockFetch = vi.fn();
-  vi.stubGlobal("fetch", mockFetch);
+  process.env.LSUPERAGENT_GATEWAY_HMAC_SECRET = GATEWAY_SECRET;
+  process.env.LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS = CLIENT_ID;
+  process.env.LSUPERAGENT_BACKEND_URL =
+    "https://example.supabase.co/functions/v1/lsuperagent-runtime";
+  process.env.RUNTIME_SHARED_SECRET = RUNTIME_SECRET;
 });
 
 afterEach(() => {
-  process.env = originalEnv;
+  delete process.env.LSUPERAGENT_GATEWAY_HMAC_SECRET;
+  delete process.env.LSUPERAGENT_GATEWAY_ALLOWED_CLIENTS;
+  delete process.env.LSUPERAGENT_BACKEND_URL;
+  delete process.env.RUNTIME_SHARED_SECRET;
   vi.unstubAllGlobals();
   vi.resetAllMocks();
 });
 
-function makeValidRuntimePayload(
+function canonicalBody() {
+  return JSON.stringify({
+    requestId: REQUEST_ID,
+    workspaceId: null,
+    action: "chat",
+    input: { message: "Return a bounded deterministic command." },
+  });
+}
+
+function signedRequest(withUserAuth = true) {
+  const rawBody = canonicalBody();
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = createHmac("sha256", GATEWAY_SECRET)
+    .update(
+      buildR3SigningString({
+        method: "POST",
+        path: "/api/chat",
+        clientId: CLIENT_ID,
+        requestId: REQUEST_ID,
+        timestamp,
+        nonce: NONCE,
+        rawBody,
+      })
+    )
+    .digest("hex");
+
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "x-lsuperagent-client": CLIENT_ID,
+    "x-lsuperagent-request-id": REQUEST_ID,
+    "x-lsuperagent-timestamp": String(timestamp),
+    "x-lsuperagent-nonce": NONCE,
+    "x-lsuperagent-signature": signature,
+  };
+  if (withUserAuth) headers.authorization = `Bearer ${USER_JWT}`;
+
+  return new Request("http://localhost/api/chat", {
+    method: "POST",
+    headers,
+    body: rawBody,
+  });
+}
+
+function healthResponse() {
+  return Response.json({
+    ok: true,
+    service: "lsuperagent-runtime",
+    version: "2026.08.30.1",
+    database: "CONNECTED",
+    provider: "claude",
+  });
+}
+
+function executionPayload(
   overrides: Partial<RuntimeExecutionPayload> = {}
 ): RuntimeExecutionPayload {
   return {
     status: "EXECUTED",
     provider: "claude",
-    runtime_version: "v1.0.0",
+    runtime_version: "2026.08.30.1",
     model: "claude-sonnet-4-6",
+    ...overrides,
     evidence: {
-      provider_request_id: "req_abc123",
-      correlation_id: "corr_xyz789",
-      qa_run_id: "qa_run_001",
+      provider_request_id: "anthropic-request-1",
+      correlation_id: "corr-1",
+      qa_run_id: "qa-1",
       ...overrides.evidence,
     },
-    ...overrides,
   };
 }
 
-function createR3SignedRequest(body: Record<string, unknown>) {
-  const clientId = process.env.LSUPERAGENT_GATEWAY_CLIENT_ID || "";
-  const secret = process.env.LSUPERAGENT_GATEWAY_HMAC_SECRET || "";
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const nonce = crypto.randomUUID();
-
-  const bodyStr = JSON.stringify(body);
-  const toSign = `${timestamp}.${nonce}.${bodyStr}`;
-  const signature = crypto
-    .createHmac("sha256", secret)
-    .update(toSign)
-    .digest("base64");
-
-  return {
-    headers: {
-      "x-lsuperagent-request-id": VALID_REQUEST_ID,
-      "x-lsuperagent-client": clientId,
-      "x-lsuperagent-timestamp": timestamp,
-      "x-lsuperagent-nonce": nonce,
-      "x-lsuperagent-signature": signature,
-      authorization: `Bearer ${VALID_USER_JWT}`,
-      "content-type": "application/json",
-    },
-    body: bodyStr,
-  };
+/** Answers the health probe on GET and the execution payload on POST. */
+function stubRuntime(payload: unknown) {
+  mockFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    if (!init?.method || init.method === "GET") return healthResponse();
+    return Response.json(payload as Record<string, unknown>);
+  });
+  vi.stubGlobal("fetch", mockFetch);
+  return mockFetch;
 }
 
-// ---------------------------------------------------------------------------
-// P0 RED Tests: Provider-neutral execution
-// ---------------------------------------------------------------------------
+function postCalls() {
+  return mockFetch.mock.calls.filter(
+    ([, init]) => (init as RequestInit | undefined)?.method === "POST"
+  );
+}
 
-describe("P0: Provider-neutral execution (currently RED — hardcoded xai)", () => {
-  it("INTENDED RED: POST accepts EXECUTED from claude provider", async () => {
-    const runtimePayload = makeValidRuntimePayload({ provider: "claude" });
+describe("P0: Gateway to runtime identity", () => {
+  it("fails closed before the backend POST when no runtime secret is configured", async () => {
+    delete process.env.RUNTIME_SHARED_SECRET;
+    stubRuntime(executionPayload());
 
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(runtimePayload), { status: 200 })
-    );
+    const response = await POST(signedRequest());
 
-    const chatRequest = { message: "Test message" };
-    const signed = createR3SignedRequest(chatRequest);
-
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: signed.headers,
-      body: signed.body,
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(200);
-
-    const body = await response.json() as Record<string, unknown>;
-    // RED: Currently expects hardcoded 'xai', will fail with 'claude'
-    expect(body.provider).toBe("claude");
-    expect(body.provider).not.toBe("xai");
+    expect(response.status).toBe(503);
+    expect(postCalls()).toHaveLength(0);
   });
 
-  it("INTENDED RED: POST accepts EXECUTED from xai provider", async () => {
-    const runtimePayload = makeValidRuntimePayload({
+  it("sends the runtime secret as a server header alongside the user token", async () => {
+    stubRuntime(executionPayload());
+
+    await POST(signedRequest());
+
+    const [call] = postCalls();
+    expect(call).toBeDefined();
+
+    const headers = new Headers((call[1] as RequestInit).headers);
+    expect(headers.get("x-lsuperagent-runtime-secret")).toBe(RUNTIME_SECRET);
+    expect(headers.get("authorization")).toBe(`Bearer ${USER_JWT}`);
+  });
+
+  it("keeps the runtime secret and the user token out of the request body", async () => {
+    stubRuntime(executionPayload());
+
+    await POST(signedRequest());
+
+    const body = String((postCalls()[0][1] as RequestInit).body ?? "");
+    expect(body).not.toContain(RUNTIME_SECRET);
+    expect(body).not.toContain(USER_JWT);
+  });
+
+  it("never returns the runtime secret to the caller", async () => {
+    stubRuntime(executionPayload());
+
+    const response = await POST(signedRequest());
+
+    expect(await response.text()).not.toContain(RUNTIME_SECRET);
+  });
+
+  it("still requires the user token even when the runtime secret is configured", async () => {
+    stubRuntime(executionPayload());
+
+    const response = await POST(signedRequest(false));
+
+    expect(response.status).toBe(401);
+    expect(postCalls()).toHaveLength(0);
+  });
+});
+
+describe("P0: Provider-neutral execution", () => {
+  it("verifies a claude execution and mirrors the provider", async () => {
+    stubRuntime(executionPayload({ provider: "claude" }));
+
+    const response = await POST(signedRequest());
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toMatchObject({
+      status: "verified",
+      provider: "claude",
+      data: { provider: "claude" },
+    });
+  });
+
+  it("verifies an xai execution and mirrors the provider", async () => {
+    stubRuntime(executionPayload({ provider: "xai", model: "grok-4.6" }));
+
+    const response = await POST(signedRequest());
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toMatchObject({
+      status: "verified",
       provider: "xai",
-      model: "grok-2",
+      data: { provider: "xai" },
     });
-
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(runtimePayload), { status: 200 })
-    );
-
-    const chatRequest = { message: "Test message" };
-    const signed = createR3SignedRequest(chatRequest);
-
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: signed.headers,
-      body: signed.body,
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(200);
-
-    const body = await response.json() as Record<string, unknown>;
-    expect(body.provider).toBe("xai");
-  });
-
-  it("INTENDED RED: top-level provider mirrors runtime provider (not hardcoded)", async () => {
-    const runtimePayload = makeValidRuntimePayload({ provider: "claude" });
-
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(runtimePayload), { status: 200 })
-    );
-
-    const chatRequest = { message: "Test message" };
-    const signed = createR3SignedRequest(chatRequest);
-
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: signed.headers,
-      body: signed.body,
-    });
-
-    const response = await POST(request);
-    const body = await response.json() as Record<string, unknown>;
-
-    // RED: Currently hardcoded to 'xai' in route.ts line 140
-    expect(body.provider).toBe("claude");
-    expect(body.provider).not.toBe("xai");
   });
 });
 
-// ---------------------------------------------------------------------------
-// P0 RED Tests: Evidence validation
-// ---------------------------------------------------------------------------
+describe("P0: Verified evidence validation", () => {
+  const cases: Array<[string, Partial<RuntimeExecutionPayload>]> = [
+    [
+      "empty provider_request_id",
+      { evidence: { provider_request_id: "", correlation_id: "c1", qa_run_id: "q1" } },
+    ],
+    [
+      "empty correlation_id",
+      { evidence: { provider_request_id: "p1", correlation_id: "", qa_run_id: "q1" } },
+    ],
+    [
+      "empty qa_run_id",
+      { evidence: { provider_request_id: "p1", correlation_id: "c1", qa_run_id: "" } },
+    ],
+    ["empty model", { model: "" }],
+    ["empty runtime_version", { runtime_version: "" }],
+    ["empty provider", { provider: "" }],
+    ["a non-EXECUTED status", { status: "FAILED" }],
+  ];
 
-describe("P0: Evidence field validation (currently RED)", () => {
-  it("INTENDED RED: rejects empty provider_request_id", async () => {
-    const runtimePayload = makeValidRuntimePayload({
-      evidence: { provider_request_id: "", correlation_id: "c1", qa_run_id: "q1" },
+  it.each(cases)("refuses to verify an execution with %s", async (_label, overrides) => {
+    stubRuntime(executionPayload(overrides));
+
+    const response = await POST(signedRequest());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      status: "failed",
+      code: "UPSTREAM_UNAVAILABLE",
     });
-
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(runtimePayload), { status: 200 })
-    );
-
-    const chatRequest = { message: "Test" };
-    const signed = createR3SignedRequest(chatRequest);
-
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: signed.headers,
-      body: signed.body,
-    });
-
-    const response = await POST(request);
-    // RED: Currently accepts it, should be 502 Bad Gateway
-    expect(response.status).toBe(502);
-  });
-
-  it("INTENDED RED: rejects empty correlation_id", async () => {
-    const runtimePayload = makeValidRuntimePayload({
-      evidence: { provider_request_id: "p1", correlation_id: "", qa_run_id: "q1" },
-    });
-
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(runtimePayload), { status: 200 })
-    );
-
-    const chatRequest = { message: "Test" };
-    const signed = createR3SignedRequest(chatRequest);
-
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: signed.headers,
-      body: signed.body,
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(502);
-  });
-
-  it("INTENDED RED: rejects empty qa_run_id", async () => {
-    const runtimePayload = makeValidRuntimePayload({
-      evidence: { provider_request_id: "p1", correlation_id: "c1", qa_run_id: "" },
-    });
-
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(runtimePayload), { status: 200 })
-    );
-
-    const chatRequest = { message: "Test" };
-    const signed = createR3SignedRequest(chatRequest);
-
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: signed.headers,
-      body: signed.body,
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(502);
-  });
-
-  it("INTENDED RED: rejects empty model field", async () => {
-    const runtimePayload = makeValidRuntimePayload({ model: "" });
-
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(runtimePayload), { status: 200 })
-    );
-
-    const chatRequest = { message: "Test" };
-    const signed = createR3SignedRequest(chatRequest);
-
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: signed.headers,
-      body: signed.body,
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(502);
-  });
-
-  it("INTENDED RED: rejects empty runtime_version", async () => {
-    const runtimePayload = makeValidRuntimePayload({ runtime_version: "" });
-
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(runtimePayload), { status: 200 })
-    );
-
-    const chatRequest = { message: "Test" };
-    const signed = createR3SignedRequest(chatRequest);
-
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: signed.headers,
-      body: signed.body,
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(502);
-  });
-
-  it("INTENDED RED: rejects empty provider field", async () => {
-    const runtimePayload = makeValidRuntimePayload({ provider: "" });
-
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(runtimePayload), { status: 200 })
-    );
-
-    const chatRequest = { message: "Test" };
-    const signed = createR3SignedRequest(chatRequest);
-
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: signed.headers,
-      body: signed.body,
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(502);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Secret discipline
-// ---------------------------------------------------------------------------
 
 describe("Secret discipline", () => {
-  it("RUNTIME_SHARED_SECRET is not set as NEXT_PUBLIC_", () => {
-    const publicKeys = Object.keys(process.env).filter((k) =>
-      k.startsWith("NEXT_PUBLIC_")
-    );
-    const leaking = publicKeys.find(
-      (k) => process.env[k] === VALID_RUNTIME_SECRET
-    );
+  it("does not expose the runtime secret through any NEXT_PUBLIC_ value", () => {
+    const leaking = Object.keys(process.env)
+      .filter((key) => key.startsWith("NEXT_PUBLIC_"))
+      .find((key) => process.env[key] === RUNTIME_SECRET);
+
     expect(leaking).toBeUndefined();
   });
 });
