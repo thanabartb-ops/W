@@ -1,9 +1,20 @@
+/**
+ * Provider and model are validated for shape only. Which providers actually
+ * exist is the runtime's to decide, and naming them here would put provider
+ * knowledge back into a gateway that was deliberately made provider-neutral.
+ * An unsupported name is rejected downstream, by the component that knows.
+ */
+const PROVIDER_NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/
+const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
+
 export type CanonicalChatRequest = {
   requestId: string
   workspaceId: string | null
   action: 'chat'
   input: {
     message: string
+    provider?: string
+    model?: string
   }
 }
 
@@ -19,6 +30,22 @@ function hasExactKeys(record: Record<string, unknown>, keys: string[]): boolean 
     actual.every((key, index) => key === expected[index])
   )
 }
+
+/**
+ * `input` accepts the original message-only shape and the shape that also
+ * selects a provider/model. Both remain exact-key checked: callers still cannot
+ * smuggle unknown fields through, and an existing caller that sends only
+ * `message` keeps working unchanged.
+ */
+function hasAllowedInputKeys(record: Record<string, unknown>): boolean {
+  return (
+    hasExactKeys(record, ['message']) ||
+    hasExactKeys(record, ['message', 'provider']) ||
+    hasExactKeys(record, ['message', 'model']) ||
+    hasExactKeys(record, ['message', 'provider', 'model'])
+  )
+}
+
 
 export function parseCanonicalChatRequest(
   input: unknown,
@@ -37,7 +64,7 @@ export function parseCanonicalChatRequest(
       typeof input.workspaceId === 'string'
     ) ||
     !isRecord(input.input) ||
-    !hasExactKeys(input.input, ['message']) ||
+    !hasAllowedInputKeys(input.input) ||
     typeof input.input.message !== 'string'
   ) {
     throw new Error('INVALID_REQUEST')
@@ -48,10 +75,30 @@ export function parseCanonicalChatRequest(
     throw new Error('INVALID_REQUEST')
   }
 
+  const { provider, model } = input.input
+
+  if (
+    provider !== undefined &&
+    (typeof provider !== 'string' || !PROVIDER_NAME.test(provider))
+  ) {
+    throw new Error('INVALID_REQUEST')
+  }
+
+  if (
+    model !== undefined &&
+    (typeof model !== 'string' || !MODEL_NAME.test(model))
+  ) {
+    throw new Error('INVALID_REQUEST')
+  }
+
   return {
     requestId: input.requestId,
     workspaceId: input.workspaceId,
     action: 'chat',
-    input: { message: input.input.message },
+    input: {
+      message: input.input.message,
+      ...(provider !== undefined ? { provider } : {}),
+      ...(model !== undefined ? { model } : {}),
+    },
   }
 }

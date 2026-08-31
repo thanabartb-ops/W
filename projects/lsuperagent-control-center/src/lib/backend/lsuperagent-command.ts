@@ -3,6 +3,9 @@ type CommandExecutionOptions = {
   userAuthToken: string
   runtimeSecret?: string
   message: string
+  /** Omitted when the caller did not select one; the runtime then uses its default. */
+  provider?: string
+  model?: string
   fetchImpl?: typeof fetch
   timeoutMs?: number
 }
@@ -85,7 +88,13 @@ export async function executeCanonicalCommand(
         authorization: `Bearer ${options.userAuthToken}`,
         'x-lsuperagent-runtime-secret': runtimeSecret,
       },
-      body: JSON.stringify({ user_request: options.message }),
+      // Selection fields are sent only when chosen, so an unselected request is
+      // byte-identical to what this gateway sent before provider choice existed.
+      body: JSON.stringify({
+        user_request: options.message,
+        ...(options.provider ? { provider: options.provider } : {}),
+        ...(options.model ? { model: options.model } : {}),
+      }),
       cache: 'no-store',
       signal: controller.signal,
     })

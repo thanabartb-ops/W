@@ -94,6 +94,8 @@ export async function POST(request: Request): Promise<Response> {
   const execution = await executeCanonicalCommand({
     userAuthToken,
     message: chatRequest.input.message,
+    provider: chatRequest.input.provider,
+    model: chatRequest.input.model,
   })
 
   if (execution.status === 'unauthenticated') {

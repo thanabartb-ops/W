@@ -63,17 +63,22 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-function canonicalBody() {
+function canonicalBody(
+  selection: { provider?: string; model?: string } = {},
+) {
   return JSON.stringify({
     requestId: REQUEST_ID,
     workspaceId: null,
     action: "chat",
-    input: { message: "Return a bounded deterministic command." },
+    input: { message: "Return a bounded deterministic command.", ...selection },
   });
 }
 
-function signedRequest(withUserAuth = true) {
-  const rawBody = canonicalBody();
+function signedRequest(
+  withUserAuth = true,
+  selection: { provider?: string; model?: string } = {},
+) {
+  const rawBody = canonicalBody(selection);
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = createHmac("sha256", GATEWAY_SECRET)
     .update(
@@ -211,6 +216,41 @@ describe("P0: Gateway to runtime identity", () => {
     const response = await POST(signedRequest(false));
 
     expect(response.status).toBe(401);
+    expect(postCalls()).toHaveLength(0);
+  });
+});
+
+describe("Provider selection reaches the runtime", () => {
+  // Two models can only be compared if the caller can say which one to run.
+  it("forwards the selected provider and model to the runtime", async () => {
+    stubRuntime(executionPayload({ provider: "anthropic" }));
+
+    await POST(signedRequest(true, { provider: "anthropic", model: "claude-opus-5" }));
+
+    const body = JSON.parse(String((postCalls()[0][1] as RequestInit).body ?? "{}"));
+    expect(body).toMatchObject({
+      provider: "anthropic",
+      model: "claude-opus-5",
+    });
+  });
+
+  // An unselected request must stay byte-identical to the pre-selection shape,
+  // or every existing signed caller starts sending something new.
+  it("sends only user_request when nothing was selected", async () => {
+    stubRuntime(executionPayload());
+
+    await POST(signedRequest());
+
+    const body = JSON.parse(String((postCalls()[0][1] as RequestInit).body ?? "{}"));
+    expect(Object.keys(body)).toEqual(["user_request"]);
+  });
+
+  it("refuses a malformed provider name before any runtime call", async () => {
+    stubRuntime(executionPayload());
+
+    const response = await POST(signedRequest(true, { provider: "../etc" }));
+
+    expect(response.status).toBe(400);
     expect(postCalls()).toHaveLength(0);
   });
 });
