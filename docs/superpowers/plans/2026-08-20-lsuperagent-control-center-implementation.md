@@ -249,10 +249,10 @@ INTERNAL_ERROR
 **Produces:** deployed-path release verification.
 
 - [ ] Install `@playwright/test` and Chromium.
-- [ ] E2E-01 CHAT: authenticated browser → Chat → gateway → visible response/correlation.
-- [ ] E2E-02 AUTHORIZATION: insufficiently scoped operation → blocked result visible.
-- [ ] E2E-03 MEMORY: authorized request → canonical memory retrieval; no mock boolean proof.
-- [ ] E2E-04 AUDIT: protected successful action → matching canonical audit correlation.
+- [ ] `E2E-01_CHAT`: authenticated browser → Chat → gateway → visible response/correlation.
+- [ ] `E2E-02_AUTHORIZATION`: insufficiently scoped operation → blocked result visible.
+- [ ] `E2E-03_MEMORY`: authorized request → canonical memory retrieval; no mock boolean proof.
+- [ ] `E2E-04_AUDIT`: protected successful action → matching canonical audit correlation.
 - [ ] Run all four against actual Preview/Staging URL.
 - [ ] Commit: `test(control-center): add four production-path e2e gates`.
 
@@ -301,11 +301,17 @@ INTERNAL_ERROR
 **Produces:** optional DNS-authority/WAF migration only after stable production.
 
 - [ ] Inventory Wix DNS and recreate required records in Cloudflare.
-- [ ] Prove full zone parity before nameserver change.
+- [ ] Inventory every owner/type, including DKIM, DMARC, verification, wildcard, and delegated-subdomain records, and prove exact parity.
+- [ ] Prove current DNSSEC/DNSKEY and parent DS state; approve the provider-supported transition and DS/nameserver rollback before nameserver change.
 - [ ] Do not combine nameserver migration with application-origin migration.
+- [ ] Validate `/api/health` by HTTP 200 **and** parsed `gateway: CONNECTED` and `backend: CONNECTED` fields.
+- [ ] Keep records DNS-only until `Full (strict)` origin validation and an active hostname-covering edge certificate are proven.
+- [ ] After delegation, validate every inventoried DNS owner/type through authoritative and independent recursive resolvers.
 - [ ] Add WAF/security rules incrementally and verify Vercel domain validation/auth/API routes after material changes.
 - [ ] Record nameserver/rule rollback before activation.
 - [ ] Commit edge-hardening runbook.
+
+**Gate:** planning may complete, but readiness remains `BLOCKED` until the evidence register P-01 through P-12 in `docs/runbooks/CLOUDFLARE_EDGE.md` is satisfied one item at a time.
 
 ## Self-review
 
