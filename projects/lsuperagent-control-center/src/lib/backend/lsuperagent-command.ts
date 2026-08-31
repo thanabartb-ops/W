@@ -12,6 +12,7 @@ export type CanonicalCommandExecution =
   | { status: 'unauthenticated' }
   | { status: 'forbidden' }
   | { status: 'blocked' }
+  | { status: 'invalid_response' }
   | { status: 'failed' }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -41,11 +42,11 @@ function validExecution(payload: unknown): payload is Record<string, unknown> {
   const evidence = payload.evidence
   return (
     typeof evidence.provider_request_id === 'string' &&
-    evidence.provider_request_id.length > 0 &&
+    evidence.provider_request_id.trim().length > 0 &&
     typeof evidence.correlation_id === 'string' &&
-    evidence.correlation_id.length > 0 &&
+    evidence.correlation_id.trim().length > 0 &&
     typeof evidence.qa_run_id === 'string' &&
-    evidence.qa_run_id.length > 0
+    evidence.qa_run_id.trim().length > 0
   )
 }
 
@@ -101,7 +102,7 @@ export async function executeCanonicalCommand(
       return { status: 'failed' }
     }
 
-    if (!validExecution(payload)) return { status: 'failed' }
+    if (!validExecution(payload)) return { status: 'invalid_response' }
     return { status: 'verified', data: payload }
   } catch {
     return { status: 'failed' }

@@ -120,6 +120,16 @@ export async function POST(request: Request): Promise<Response> {
     })
   }
 
+  if (execution.status === 'invalid_response') {
+    return failedResponse(502, {
+      requestId: headerRequestId,
+      status: 'failed',
+      code: 'INVALID_UPSTREAM_RESPONSE',
+      gateway: 'CONNECTED',
+      backend: 'CONNECTED',
+    })
+  }
+
   if (execution.status !== 'verified') {
     return failedResponse(503, {
       requestId: headerRequestId,

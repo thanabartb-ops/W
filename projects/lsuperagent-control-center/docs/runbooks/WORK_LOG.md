@@ -30,3 +30,20 @@ When a failure occurs, record:
 8. rollback action taken or available
 
 Never record secrets, access tokens, authorization headers, service-role credentials, or raw private keys.
+
+## 2026-08-31 — R8 edge-hardening readiness planning
+
+- Release: `R8_EDGE_HARDENING_READINESS`
+- Scope: documentation and sanitized evidence planning only
+- Release-label reconciliation: roadmap R7 named domain cutover, while completed
+  implementation R7 covered the authenticated runtime command (48 PASS / 0 FAIL /
+  0 SKIP); no domain-cutover or stable-production result is inferred
+- Readiness result: `BLOCKED`
+- Blocking evidence: production identity/stability, deployed E2E/QAMap, complete
+  Wix/Cloudflare zone parity, ownership approval, and executable rollback packet
+- External queries or mutations: none
+- Runtime, R7 tests/contracts, Supabase, Vercel, Wix, and Cloudflare changes: none
+- Runbook: `docs/runbooks/CLOUDFLARE_EDGE.md`
+- Evidence packet: `docs/releases/R8_EDGE_HARDENING_READINESS.md`
+- Next boundary: collect sanitized evidence under owner authorization, then return
+  for explicit owner review; readiness completion does not authorize activation

@@ -21,7 +21,7 @@ describe('R5 xAI provider adapter', () => {
 
     const provider = createXaiProvider({
       apiKey: 'xai-test-key-not-a-secret',
-      model: 'grok-build-0.1',
+      model: 'grok-4.6',
       fetchImpl,
     })
 
@@ -29,7 +29,7 @@ describe('R5 xAI provider adapter', () => {
 
     expect(result).toEqual({
       provider: 'xai',
-      model: 'grok-build-0.1',
+      model: 'grok-4.6',
       requestId: 'xai_req_123',
       outputText: 'LSUPERAGENT_XAI_CANARY_OK',
     })
@@ -41,6 +41,12 @@ describe('R5 xAI provider adapter', () => {
         'content-type': 'application/json',
         authorization: 'Bearer xai-test-key-not-a-secret',
       },
+    })
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body))).toEqual({
+      model: 'grok-4.6',
+      input: 'Return exactly: LSUPERAGENT_XAI_CANARY_OK',
+      store: false,
+      max_output_tokens: 256,
     })
   })
 

@@ -250,15 +250,17 @@ describe("P0: Verified evidence validation", () => {
     ["a non-EXECUTED status", { status: "FAILED" }],
   ];
 
+  // A malformed EXECUTED payload is a distinct failure from an unreachable
+  // upstream: the runtime answered, just not with something verifiable.
   it.each(cases)("refuses to verify an execution with %s", async (_label, overrides) => {
     stubRuntime(executionPayload(overrides));
 
     const response = await POST(signedRequest());
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(502);
     expect(await response.json()).toMatchObject({
       status: "failed",
-      code: "UPSTREAM_UNAVAILABLE",
+      code: "INVALID_UPSTREAM_RESPONSE",
     });
   });
 });
