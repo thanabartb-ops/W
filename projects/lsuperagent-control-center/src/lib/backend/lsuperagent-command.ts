@@ -95,11 +95,14 @@ export async function executeCanonicalCommand(
     if (response.status === 429) return { status: 'blocked' }
     if (!response.ok) return { status: 'failed' }
 
+    // A 200 the runtime could not even encode is the same class of failure as a
+    // 200 whose shape is wrong: the runtime answered, the answer is unusable.
+    // Reporting one as unavailable and the other as invalid hid that from callers.
     let payload: unknown
     try {
       payload = await response.json()
     } catch {
-      return { status: 'failed' }
+      return { status: 'invalid_response' }
     }
 
     if (!validExecution(payload)) return { status: 'invalid_response' }

@@ -144,6 +144,19 @@ function stubRuntime(payload: unknown) {
   return mockFetch;
 }
 
+/** Same, but the execution response carries a body that is not JSON at all. */
+function stubRuntimeWithUnparseableBody(body: string) {
+  mockFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    if (!init?.method || init.method === "GET") return healthResponse();
+    return new Response(body, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  vi.stubGlobal("fetch", mockFetch);
+  return mockFetch;
+}
+
 function postCalls() {
   return mockFetch.mock.calls.filter(
     ([, init]) => (init as RequestInit | undefined)?.method === "POST"
@@ -254,6 +267,21 @@ describe("P0: Verified evidence validation", () => {
   // upstream: the runtime answered, just not with something verifiable.
   it.each(cases)("refuses to verify an execution with %s", async (_label, overrides) => {
     stubRuntime(executionPayload(overrides));
+
+    const response = await POST(signedRequest());
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({
+      status: "failed",
+      code: "INVALID_UPSTREAM_RESPONSE",
+    });
+  });
+
+  // A body the runtime could not encode at all belongs in the same class: it
+  // answered, the answer is unusable. Reporting this one as UPSTREAM_UNAVAILABLE
+  // told callers the runtime was unreachable when it had in fact replied.
+  it("reports a 200 whose body is not JSON as an invalid response, not an outage", async () => {
+    stubRuntimeWithUnparseableBody("<html>gateway timeout</html>");
 
     const response = await POST(signedRequest());
 

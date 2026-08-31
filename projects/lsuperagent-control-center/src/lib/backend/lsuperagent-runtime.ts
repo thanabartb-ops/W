@@ -30,6 +30,51 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && !Array.isArray(value) && typeof value === 'object'
 }
 
+type CachedProbeOptions = BackendProbeOptions & {
+  ttlMs?: number
+  nowMs?: number
+}
+
+const PROBE_CACHE_TTL_MS = 15_000
+
+let cachedProbe: { at: number; probe: CanonicalBackendProbe } | null = null
+let inFlightProbe: Promise<CanonicalBackendProbe> | null = null
+
+/**
+ * The health endpoint is public and unauthenticated, and every probe reaches the
+ * runtime, which in turn queries the database. Without this, anyone could turn a
+ * cheap request loop into database load. Concurrent callers share one in-flight
+ * probe, and the result is reused briefly, so a burst costs a single round trip.
+ *
+ * Deliberately not used by the chat route: an authenticated execution should see
+ * the runtime's current state, not a cached one.
+ */
+export async function probeCanonicalBackendCached(
+  options: CachedProbeOptions = {},
+): Promise<CanonicalBackendProbe> {
+  const ttlMs = options.ttlMs ?? PROBE_CACHE_TTL_MS
+  const nowMs = options.nowMs ?? Date.now()
+
+  if (cachedProbe && nowMs - cachedProbe.at < ttlMs) return cachedProbe.probe
+  if (inFlightProbe) return inFlightProbe
+
+  inFlightProbe = probeCanonicalBackend(options)
+    .then((probe) => {
+      cachedProbe = { at: nowMs, probe }
+      return probe
+    })
+    .finally(() => {
+      inFlightProbe = null
+    })
+
+  return inFlightProbe
+}
+
+export function resetCanonicalBackendProbeCache(): void {
+  cachedProbe = null
+  inFlightProbe = null
+}
+
 export async function probeCanonicalBackend(
   options: BackendProbeOptions = {},
 ): Promise<CanonicalBackendProbe> {

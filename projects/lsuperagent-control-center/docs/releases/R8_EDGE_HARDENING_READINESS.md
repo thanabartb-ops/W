@@ -17,7 +17,7 @@ new readiness gate and does not authorize infrastructure activation.
 ## Decision basis
 
 The repository does not contain observable, current evidence for production
-deployment/stability, deployed E2E-001..004 and QAMap correlation, a complete
+deployment/stability, deployed E2E-01_CHAT..E2E-04_AUDIT and QAMap correlation, a complete
 sanitized Wix/Cloudflare zone comparison, owner permissions, or executable
 rollback targets. Under the fail-closed contract, the only valid result is:
 
@@ -34,7 +34,7 @@ No example or inferred infrastructure value has been used in place of evidence.
 | P-03 | Apex/`www` and Vercel target confirmation | Not available | `BLOCKED` |
 | P-04 | TLS certificate and renewal health | Not available | `BLOCKED` |
 | P-05 | Production Supabase Auth callback | Not available | `BLOCKED` |
-| P-06 | Production E2E-001..004 | Not available | `BLOCKED` |
+| P-06 | Production E2E-01_CHAT..E2E-04_AUDIT | Not available | `BLOCKED` |
 | P-07 | Audit correlation and QAMap mapping | Not available | `BLOCKED` |
 | P-08 | Complete sanitized Wix zone/TTLs | Not available | `BLOCKED` |
 | P-09 | Email/non-web inventory and parity | Not available | `BLOCKED` |
@@ -61,10 +61,10 @@ The canonical runtime mapping remains unchanged:
 
 | Existing ID | Surface | Current R8 production evidence |
 | --- | --- | --- |
-| E2E-001 | CHAT | `BLOCKED` — deployed-path evidence absent |
-| E2E-002 | AUTHORIZATION | `BLOCKED` — deployed-path evidence absent |
-| E2E-003 | MEMORY | `BLOCKED` — deployed-path evidence absent |
-| E2E-004 | AUDIT | `BLOCKED` — deployed-path/correlation evidence absent |
+| E2E-01_CHAT | CHAT | `BLOCKED` — deployed-path evidence absent |
+| E2E-02_AUTHORIZATION | AUTHORIZATION | `BLOCKED` — deployed-path evidence absent |
+| E2E-03_MEMORY | MEMORY | `BLOCKED` — deployed-path evidence absent |
+| E2E-04_AUDIT | AUDIT | `BLOCKED` — deployed-path/correlation evidence absent |
 
 R8 edge entries are independently identified as R8-EDGE-001 through
 R8-EDGE-010 in the runbook validation matrix. They must not be renamed to the E2E

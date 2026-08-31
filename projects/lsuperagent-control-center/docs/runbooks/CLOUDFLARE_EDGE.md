@@ -55,7 +55,7 @@ Every row requires sanitized, observable evidence. A missing row makes the relea
 | P-03 | Apex and `www` match Vercel-confirmed production targets | R8 evidence packet, P-03 | `BLOCKED` — authoritative and Vercel evidence absent |
 | P-04 | TLS certificate identity, chain, expiry, and renewal state healthy | R8 evidence packet, P-04 | `BLOCKED` — production evidence absent |
 | P-05 | Supabase Auth production callback succeeds | R8 evidence packet, P-05 | `BLOCKED` — production-flow evidence absent |
-| P-06 | E2E-001 through E2E-004 pass against deployed production | R8 evidence packet, P-06 | `BLOCKED` — deployed-path evidence absent |
+| P-06 | E2E-01_CHAT through E2E-04_AUDIT pass against deployed production | R8 evidence packet, P-06 | `BLOCKED` — deployed-path evidence absent |
 | P-07 | Canonical audit correlation and QAMap mapping | R8 evidence packet, P-07 | `BLOCKED` — production mapping absent |
 | P-08 | Complete sanitized Wix inventory including required values and TTLs | Source-zone table below and R8 packet, P-08 | `BLOCKED` — authorized export absent |
 | P-09 | Email and all non-web records identified with parity plan | Source/target tables below, P-09 | `BLOCKED` — inventory absent |
@@ -182,7 +182,7 @@ openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" \
 ```
 
 Before activation, also run the existing R1/R2/R7 regression suite, full Vitest,
-TypeScript, lint, and production build; run E2E-001..004 against the deployed
+TypeScript, lint, and production build; run E2E-01_CHAT..E2E-04_AUDIT against the deployed
 production URL using the repository's approved harness. Authentication and
 `/api/chat` checks must use secret-safe tooling and must not print headers or
 payload secrets. Every captured result records UTC timestamp, environment,
@@ -199,7 +199,7 @@ release ID, sanitized reference/correlation ID, resolver/system, and rollback.
 | R8-EDGE-005 | Baseline/post | Auth callback | Login, callback, and session refresh pass | Sanitized Supabase/request references |
 | R8-EDGE-006 | Parity/post | Email | MX, SPF, DKIM, DMARC exact parity; approved non-destructive flow passes | Resolver/provider references |
 | R8-EDGE-007 | Parity/post | Verification/CAA | No missing or unexplained difference | Record IDs and provider references |
-| R8-EDGE-008 | Baseline/post | Runtime E2E/QAMap | E2E-001 CHAT, E2E-002 AUTHORIZATION, E2E-003 MEMORY, E2E-004 AUDIT pass | Canonical correlation and QAMap refs |
+| R8-EDGE-008 | Baseline/post | Runtime E2E/QAMap | E2E-01_CHAT, E2E-02_AUTHORIZATION, E2E-03_MEMORY, E2E-04_AUDIT pass | Canonical correlation and QAMap refs |
 | R8-EDGE-009 | Post | Delegation | Approved Cloudflare NS visible from independent resolvers | Resolver answers and UTC |
 | R8-EDGE-010 | Post | Stability | Error rate, latency, and upstream status within approved thresholds/window | Monitoring reference |
 
