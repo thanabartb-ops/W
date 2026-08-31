@@ -161,7 +161,7 @@ Repository source inspection: COMPLETE
 Physical Supabase inspection: NOT_AVAILABLE
 Deployed runtime parity: NOT_AVAILABLE
 Authenticated API command: NOT_AVAILABLE
-E2E-001..004: NOT_EXECUTED
+E2E-01_CHAT, E2E-02_AUTHORIZATION, E2E-03_MEMORY, E2E-04_AUDIT: NOT_EXECUTED
 QAMap: NOT_VERIFIED
 Final state: NOT_VERIFIED
 ```
