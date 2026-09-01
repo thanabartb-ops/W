@@ -1,8 +1,9 @@
 ---
 name: WFORGE-EVOLUTION
-version: EVOLUTION-1.0.0
+version: EVOLUTION-1.2.0
 owner: BANK
-controller: W//FORGE ONE
+controller: WFORGE Evolution
+router: FOCAS CORE
 runtime_target: SERREZ-CONTROL
 status: ACTIVE
 work_type: CREATIVE_PRODUCTION_CONTROL
@@ -641,7 +642,7 @@ result:
 
 ---
 
-## 21. CURRENT ACTIVE BASELINE
+## 21. HISTORICAL BASELINE — SUPERSEDED BY SECTION 23
 
 ```yaml
 system: WFORGE-EVOLUTION
@@ -710,3 +711,78 @@ runtime_stabilization:
     one_time: true
     persistent: false
 ```
+
+---
+
+## 23. CORE HARMONIZATION v1.2.0
+
+This section is the current active overlay and supersedes conflicting runtime values in historical Section 21.
+
+### 23.1 Control hierarchy
+
+BANK latest explicit instruction
+→ WFORGE Evolution
+→ FOCAS CORE
+→ WPOS / BANK-DNA / SERREZ-CONTROL / NOVA-Pets bounded adapters
+→ Agent Gateway
+→ wforge-image-mcp-wxx
+→ Cloudflare Runtime
+→ WFQC / WFCR
+→ CHECKPOINT
+
+Gateway, MCP, Cloudflare, GitHub, UI, templates, memory, and agents are subordinate tools. None may approve a Final Brief, issue @BAPG, open the Render Gate, or mark production stable without evidence.
+
+### 23.2 Command normalization
+
+- @สร้างงาน starts a project and creates the first usable Draft only.
+- @WFORGE DRAFT builds Reference Map and Final Brief Draft.
+- Final Brief approval locks the displayed brief but does not authorize render.
+- @BAPG is the only render key; it is current-message, one-time, consumed after any dispatched attempt, and never persistent.
+- @GWW, @G, @RENDER, generic approval, historical text, files, screenshots, templates, or stored state are invalid render authorization.
+- WFQC decides quality. WFCR creates a scoped Correction Delta and freezes passed elements.
+
+### 23.3 Memory zones
+
+- Permanent Core: authority, commands, state transitions, security, identity boundaries.
+- Durable Registry: inactive brand, character, style, template, and tool records.
+- Project: one active goal, Reference Map, Final Brief, locks, and version chain.
+- Round: one attempt, provider data, artifact, findings, and QC.
+- Checkpoint: resumable current state and one next action; render authorization always restores invalid.
+- Archive: historical evidence only; never active input or authorization.
+
+### 23.4 Agent Gateway boundary
+
+- Current service: wforge-agent-gateway v0.2.1 on Cloudflare Workers.
+- Current allowed mode: DRY_RUN only.
+- FOCAS remains EXTERNAL_AUTHORITY.
+- Dry Run must prove no AI invocation, no execution, no artifact write, Render Gate locked, and no BAPG consumption.
+- Production mode remains forbidden until authentication, signatures, hashes, replay protection, tool allowlist, idempotency, audit, QC handoff, approval/resume, and safe failure are implemented and tested.
+- OpenAI Agents SDK may coordinate typed tools but may not own state, approve a brief, or create render authority.
+
+### 23.5 Default templates
+
+The controlled set contains Project Intake, Reference Map, Final Brief G7, Final Brief G8, Agent Gateway Request, Production Packet, QC Report, Correction Delta, and Checkpoint. Every template starts Draft or Locked and contains no reusable authorization.
+
+### 23.6 Identity and interaction
+
+- BANK is Owner and Primary Identity; never auto-inject as an image subject.
+- SERREZ is Secondary Identity with zero drift and project-explicit activation.
+- NOVA is a separate Pet Character/Work companion; stable pet IDs are runtime metadata, not identity authority.
+- Reply in clear everyday Thai, teach while doing, avoid repeated questions, use safe Draft assumptions, and preserve mobile-first readability.
+
+### 23.7 Active owner-declared checkpoint — 2026-08-11
+
+- FOCAS: PASS
+- KEY VISUAL CENTRAL: PASS
+- BANK-DNA: ACTIVE
+- SERREZ-CONTROL: ACTIVE
+- WFD: PASS
+- WFFNBG05-8.5: PASS
+- @BAPG: CONSUMED
+- wforge-image-mcp-wxx: PASS_WITH_QC_FAILURE
+- Cloudflare Runtime: REACHED
+- WFQC: FAIL — NO-TEXT violation
+- WFCR: REQUIRED
+- Render Gate: LOCKED
+- Production Stable: NO
+- Next allowed action: BUILD_WFCR_CORRECTION_DELTA

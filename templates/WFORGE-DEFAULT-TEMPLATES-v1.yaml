@@ -1,0 +1,69 @@
+schema:
+  name: WFORGE_DEFAULT_TEMPLATES
+  version: 1.0.0
+  status: CONTROLLED_FALLBACK
+  note: Used because no callable OpenAI Default Templates capability was exposed during the audit.
+
+global_defaults:
+  owner: BANK
+  controller: WFORGE_EVOLUTION
+  router: FOCAS_CORE
+  source_policy: SINGLE_ACTIVE_SET
+  interaction_mode: DRAFT_FIRST
+  render_gate: LOCKED
+  render_authorization: INVALID
+  historical_input_activation: FORBIDDEN
+
+templates:
+  - id: PROJECT_INTAKE
+    schema: wforge.project-intake.v1
+    initial_status: DRAFT
+    required: [PROJECT_ID, WORK_TYPE, GOAL, DELIVERABLE, BRAND, CHARACTER, COPY, REFERENCES, CONSTRAINTS]
+    next_action: BUILD_PRODUCTION_OBJECTIVE
+
+  - id: REFERENCE_MAP
+    schema: wforge.reference-map.v1
+    initial_status: DRAFT
+    required: [REFERENCE_ID, SOURCE, ROLES, USE, DO_NOT_USE, CONTRIBUTION_PERMISSIONS, AVAILABILITY, HASH]
+    identity_sources_per_character: 1
+
+  - id: FINAL_BRIEF_G7
+    schema: wforge.final-brief.v1
+    gear: GEAR_7
+    sections: [PRODUCTION_OBJECTIVE, SUBJECT_IDENTITY_LOCK, BRAND_LOCK, MAIN_OFFER_LOCK, EXACT_TEXT_LOCK, VISUAL_DIRECTION, OUTPUT_QC_LOCK]
+    initial_status: DRAFT
+
+  - id: FINAL_BRIEF_G8
+    schema: wforge.final-brief.v1
+    gear: GEAR_8
+    sections: [PRODUCTION_OBJECTIVE, SUBJECT_IDENTITY_LOCK, BRAND_LOCK, MAIN_OFFER_LOCK, EXACT_TEXT_LOCK, VISUAL_DIRECTION, OUTPUT_QC_LOCK, PRODUCTION_PRECISION_CONTROL]
+    initial_status: DRAFT
+
+  - id: AGENT_GATEWAY_REQUEST
+    schema: wforge.agent-gateway-request.v1
+    mode: DRY_RUN
+    authority: EXTERNAL_AUTHORITY
+    side_effects_allowed: false
+
+  - id: PRODUCTION_PACKET
+    schema: wpos.production-packet.v1
+    initial_status: DRAFT
+    executable_status: SEALED
+    required_components: [APPROVED_REFERENCE_MAP, LOCKED_FINAL_BRIEF, LATEST_DELTA, CURRENT_RENDER_COMMAND, ACTIVE_LOCKS, OUTPUT_SPEC, COMPONENT_HASHES, PREFLIGHT]
+    render_gate_default: LOCKED
+
+  - id: QC_REPORT
+    schema: wforge.qc-report.v1
+    hard_gates: [IDENTITY, ANATOMY, BANK_DNA, BRAND, OFFER, EXACT_TEXT, SCENE, COMPOSITION, MOBILE_READABILITY, OUTPUT, EXECUTION]
+    verdicts: [PASS, CONDITIONAL_PASS, FAIL]
+
+  - id: CORRECTION_DELTA
+    schema: wforge.correction-delta.v1
+    initial_status: DRAFT
+    required: [FAILED_QC_GROUP, CHANGED, UNCHANGED, INVALIDATED, NEW_VERSIONS, ALLOWED_CHANGES, FORBIDDEN_CHANGES, REGRESSION_CHECKS]
+    freeze_passed_elements: true
+
+  - id: CHECKPOINT
+    schema: wforge.checkpoint.v1
+    required: [PROJECT_ID, CURRENT_STATE, ACTIVE_SOURCE_OF_TRUTH, LATEST_ACTION, QC_STATUS, BLOCKERS, ONE_NEXT_ACTION, PRESERVE_LIST]
+    render_authorization_on_restore: INVALID

@@ -11,6 +11,9 @@ on:
       - CHECKPOINT.yaml
       - style/STYLE-CONTROL-150/MANIFEST.yaml
       - expert-system/contract.json
+      - source-of-truth/WFORGE-CORE-HARMONIZATION-v1.2.yaml
+      - source-of-truth/WFORGE-AGENT-GATEWAY-v0.2.yaml
+      - templates/WFORGE-DEFAULT-TEMPLATES-v1.yaml
       - .github/workflows/wforge-qc.yml
 
 permissions:
@@ -52,13 +55,16 @@ jobs:
           import yaml
 
           ROOT = Path(".")
-          EXPECTED_VERSION = "EVOLUTION-1.0.0"
+          EXPECTED_VERSION = "EVOLUTION-1.2.0"
           REQUIRED_FILES = {
               "version": ROOT / "VERSION",
               "skill": ROOT / "WFORGE-EVOLUTION.skill.md",
               "checkpoint": ROOT / "CHECKPOINT.yaml",
               "manifest": ROOT / "style/STYLE-CONTROL-150/MANIFEST.yaml",
               "contract": ROOT / "expert-system/contract.json",
+              "core_manifest": ROOT / "source-of-truth/WFORGE-CORE-HARMONIZATION-v1.2.yaml",
+              "gateway_map": ROOT / "source-of-truth/WFORGE-AGENT-GATEWAY-v0.2.yaml",
+              "templates": ROOT / "templates/WFORGE-DEFAULT-TEMPLATES-v1.yaml",
           }
 
           errors: list[str] = []
@@ -117,6 +123,16 @@ jobs:
           except json.JSONDecodeError as exc:
               fail(f"contract.json is invalid JSON: {exc}")
               contract = {}
+
+          extra_yaml = {}
+          for label in ("core_manifest", "gateway_map", "templates"):
+              try:
+                  extra_yaml[label] = yaml.safe_load(
+                      REQUIRED_FILES[label].read_text(encoding="utf-8")
+                  ) or {}
+              except yaml.YAMLError as exc:
+                  fail(f"{REQUIRED_FILES[label].as_posix()} is invalid YAML: {exc}")
+                  extra_yaml[label] = {}
 
           versions = {
               "VERSION": version,
@@ -227,6 +243,9 @@ jobs:
               "CHECKPOINT.yaml",
               "style/STYLE-CONTROL-150/MANIFEST.yaml",
               "expert-system/contract.json",
+              "source-of-truth/WFORGE-CORE-HARMONIZATION-v1.2.yaml",
+              "source-of-truth/WFORGE-AGENT-GATEWAY-v0.2.yaml",
+              "templates/WFORGE-DEFAULT-TEMPLATES-v1.yaml",
           }
           if required_contract_files != expected_contract_files:
               fail(
@@ -238,6 +257,45 @@ jobs:
               fail("Checkpoint must state runtime_modified=false at this foundation stage")
           if checkpoint.get("runtime_state", {}).get("render_execution", {}).get("render_performed") is not False:
               fail("Checkpoint must state render_performed=false")
+          core_manifest = extra_yaml.get("core_manifest", {})
+          gateway_map = extra_yaml.get("gateway_map", {})
+          templates = extra_yaml.get("templates", {})
+
+          if core_manifest.get("render_security", {}).get("gate") != "LOCKED":
+              fail("Core harmonization manifest must keep render gate LOCKED")
+          current_checkpoint = core_manifest.get("current_checkpoint", {})
+          if current_checkpoint.get("WFQC") != "FAIL_NO_TEXT_VIOLATION":
+              fail("Core manifest must preserve latest WFQC NO-TEXT failure")
+          if current_checkpoint.get("WFCR") != "REQUIRED":
+              fail("Core manifest must route next work to WFCR")
+          if current_checkpoint.get("PRODUCTION_STABLE") is not False:
+              fail("Core manifest must not claim production stable")
+
+          if gateway_map.get("runtime_contract", {}).get("allowed_mode") != "DRY_RUN":
+              fail("Agent Gateway must remain DRY_RUN only")
+          gateway_evidence = gateway_map.get("evidence_status", {})
+          if gateway_evidence.get("SOURCE_MERGED") is not False:
+              fail("Gateway source must remain recorded as not merged")
+          if gateway_evidence.get("PRODUCTION_READY") is not False:
+              fail("Gateway must not claim production readiness")
+
+          expected_template_ids = {
+              "PROJECT_INTAKE", "REFERENCE_MAP", "FINAL_BRIEF_G7",
+              "FINAL_BRIEF_G8", "AGENT_GATEWAY_REQUEST", "PRODUCTION_PACKET",
+              "QC_REPORT", "CORRECTION_DELTA", "CHECKPOINT",
+          }
+          actual_template_ids = {
+              item.get("id") for item in templates.get("templates", [])
+              if isinstance(item, dict)
+          }
+          if actual_template_ids != expected_template_ids:
+              fail(f"Default template IDs mismatch: {sorted(actual_template_ids)!r}")
+          template_defaults = templates.get("global_defaults", {})
+          if template_defaults.get("render_gate") != "LOCKED":
+              fail("Default templates must keep render gate LOCKED")
+          if template_defaults.get("render_authorization") != "INVALID":
+              fail("Default templates must not persist render authorization")
+
           if contract.get("source_preservation", {}).get("runtime_modified") is not False:
               fail("Contract must state runtime_modified=false")
           if contract.get("source_preservation", {}).get("github_modified") is not False:
