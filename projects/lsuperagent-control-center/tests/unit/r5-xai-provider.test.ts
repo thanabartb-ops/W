@@ -3,8 +3,10 @@ import { createXaiProvider } from '../../src/lib/providers/xai'
 
 describe('R5 xAI provider adapter', () => {
   it('calls only the xAI Responses API with the configured key and model', async () => {
-    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(
+    const fetchImpl = vi.fn(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
         JSON.stringify({
           id: 'resp_test_123',
           output_text: 'LSUPERAGENT_XAI_CANARY_OK',

@@ -47,8 +47,10 @@ describe('R6 xAI canonical runtime compiler', () => {
       evidence_required: ['provider request id'],
     }
 
-    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(JSON.stringify({ id: 'resp_r6', output_text: JSON.stringify(command) }), {
+    const fetchImpl = vi.fn(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ id: 'resp_r6', output_text: JSON.stringify(command) }), {
         status: 200,
         headers: {
           'content-type': 'application/json',

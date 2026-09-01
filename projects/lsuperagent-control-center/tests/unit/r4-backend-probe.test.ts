@@ -8,6 +8,7 @@ import {
 describe('R4 canonical backend probe', () => {
   it('treats a non-2xx runtime health response as disconnected even when the database is connected', async () => {
     const fetchImpl = vi.fn(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
         new Response(
           JSON.stringify({
