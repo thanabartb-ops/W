@@ -314,11 +314,15 @@ Cloudflare activation is R8, not a prerequisite for R1–R7.
 If DNS authority is migrated from Wix to Cloudflare:
 
 1. inventory the complete Wix DNS zone first;
-2. recreate required records in Cloudflare;
-3. validate email and non-web records;
-4. change nameservers only after zone parity is proven;
-5. enable WAF/security rules only after the application is stable;
-6. do not proxy routes in a way that breaks Vercel domain verification or authentication callbacks.
+2. include every owner/type, including DKIM, DMARC, verification, wildcard, and delegated-subdomain records;
+3. prove the current DNSSEC/DNSKEY and parent DS state and approve a matching DNSSEC transition and rollback before changing nameservers;
+4. recreate required records in Cloudflare and prove exact zone parity;
+5. change nameservers only after parity and the DNSSEC/DS prerequisite are proven;
+6. validate every inventoried owner/type after delegation, not only apex and `www`;
+7. keep records DNS-only until Cloudflare is set to `Full (strict)`, the origin certificate validates, and an active edge certificate covers each hostname to proxy;
+8. require `/api/health` HTTP 200 plus parsed `gateway: CONNECTED` and `backend: CONNECTED` fields before and after each material change;
+9. enable WAF/security rules only after the application is stable;
+10. do not proxy routes in a way that breaks Vercel domain verification or authentication callbacks.
 
 Cloudflare must not host a second copy of the LSUPERAGENT application unless a separately approved disaster-recovery design exists.
 
@@ -336,10 +340,10 @@ Cover Supabase session verification, authorized canonical reads, denied reads/wr
 
 Only four mandatory production-path tests for V1:
 
-1. `E2E-01 CHAT` — authenticated browser → Chat UI → `/api/chat` → gateway → response visible.
-2. `E2E-02 AUTHORIZATION` — unauthorized/insufficiently scoped action → gateway → blocked result visible.
-3. `E2E-03 MEMORY` — authorized request → canonical memory retrieval → expected context used/returned.
-4. `E2E-04 AUDIT` — successful protected action → canonical audit record/correlation evidence exists.
+1. `E2E-01_CHAT` — authenticated browser → Chat UI → `/api/chat` → gateway → response visible.
+2. `E2E-02_AUTHORIZATION` — unauthorized/insufficiently scoped action → gateway → blocked result visible.
+3. `E2E-03_MEMORY` — authorized request → canonical memory retrieval → expected context used/returned.
+4. `E2E-04_AUDIT` — successful protected action → canonical audit record/correlation evidence exists.
 
 E2E must exercise the deployed application. A mock boolean such as `tenantIsolationVerified = true` is never considered proof.
 
