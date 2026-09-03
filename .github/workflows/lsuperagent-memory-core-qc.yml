@@ -1,0 +1,142 @@
+name: LSUPERAGENT Memory Core QC
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - source-of-truth/LSUPERAGENT_MEMORY_CORE_v1.yaml
+      - supabase/migrations/**_lsuperagent_memory_core.sql
+      - .github/workflows/lsuperagent-memory-core-qc.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lsuperagent-memory-core-qc-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory-core-contract:
+    name: Memory Core contract and migration QC
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validator dependency
+        run: python -m pip install --disable-pip-version-check PyYAML==6.0.2
+
+      - name: Validate Memory Core manifest and migration
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import sys
+          from pathlib import Path
+
+          import yaml
+
+          manifest_path = Path("source-of-truth/LSUPERAGENT_MEMORY_CORE_v1.yaml")
+          errors: list[str] = []
+
+          def fail(message: str) -> None:
+              errors.append(message)
+              print(f"::error::{message}")
+
+          if not manifest_path.is_file():
+              fail(f"Missing manifest: {manifest_path}")
+              manifest = {}
+          else:
+              try:
+                  manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+              except yaml.YAMLError as exc:
+                  fail(f"Manifest YAML is invalid: {exc}")
+                  manifest = {}
+
+          schema = manifest.get("schema", {})
+          release = manifest.get("release", {})
+          guard = manifest.get("release_guard", {})
+
+          if schema.get("status") != "DATABASE_FOUNDATION_STAGED":
+              fail("Memory Core must remain staged until approved production apply is verified")
+          if release.get("deployment_state") != "NOT_DEPLOYED_FROM_THIS_PR":
+              fail("PR manifest must not claim production deployment")
+          if release.get("production_verification") != "PENDING_AFTER_APPROVED_APPLY":
+              fail("Production verification must remain pending in this PR")
+          if release.get("required_approval") != "RELEASE_APPROVED":
+              fail("Production migration must require RELEASE_APPROVED")
+
+          migration_source = release.get("migration_source")
+          guard_source = guard.get("database_migration")
+          if not isinstance(migration_source, str) or not migration_source:
+              fail("release.migration_source is required")
+              migration_path = None
+          else:
+              migration_path = Path(migration_source)
+              if not migration_path.is_file():
+                  fail(f"Declared migration does not exist: {migration_source}")
+
+          if guard_source != migration_source:
+              fail(
+                  "release_guard.database_migration must match release.migration_source: "
+                  f"{guard_source!r} != {migration_source!r}"
+              )
+
+          if migration_path and migration_path.is_file():
+              migration_bytes = migration_path.read_bytes()
+              migration_text = migration_bytes.decode("utf-8")
+              migration_lower = migration_text.lower()
+              actual_sha256 = hashlib.sha256(migration_bytes).hexdigest()
+              declared_hashes = {
+                  "release.migration_source_sha256": release.get("migration_source_sha256"),
+                  "release_guard.migration_sha256": guard.get("migration_sha256"),
+              }
+              for label, declared in declared_hashes.items():
+                  if declared != actual_sha256:
+                      fail(f"{label} mismatch: expected {actual_sha256}, found {declared!r}")
+
+              required_fragments = {
+                  "private schema": "create schema if not exists lsuperagent",
+                  "client schema revoke": "revoke all on schema lsuperagent from public, anon, authenticated",
+                  "RLS memory_records": "alter table lsuperagent.memory_records enable row level security",
+                  "RLS memory_audit_events": "alter table lsuperagent.memory_audit_events enable row level security",
+                  "lifecycle guard function": "enforce_memory_record_lifecycle",
+                  "lifecycle guard trigger": "memory_records_lifecycle_guard",
+                  "automatic audit function": "audit_memory_record_change",
+                  "automatic audit trigger": "memory_records_audit_append",
+                  "updated_at trigger assignment": "new.updated_at := pg_catalog.now()",
+                  "append-only audit trigger": "memory_audit_events_append_only",
+                  "public helper execute revoke": "revoke execute on function public.rls_auto_enable() from public, anon, authenticated",
+              }
+              for label, fragment in required_fragments.items():
+                  if fragment not in migration_lower:
+                      fail(f"Missing required migration control: {label}")
+
+              forbidden_fragments = {
+                  "service_role DELETE grant": "grant select, insert, update, delete on lsuperagent.memory_records to service_role",
+                  "client table grant": "grant all on lsuperagent.memory_records to authenticated",
+              }
+              for label, fragment in forbidden_fragments.items():
+                  if fragment in migration_lower:
+                      fail(f"Forbidden migration control detected: {label}")
+
+          if errors:
+              print(f"\nLSUPERAGENT Memory Core QC: FAIL ({len(errors)} error(s))")
+              sys.exit(1)
+
+          print("LSUPERAGENT Memory Core QC: PASS")
+          print(f"Migration: {migration_source}")
+          print(f"SHA256: {release.get('migration_source_sha256')}")
+          print("Deployment state: STAGED / NOT DEPLOYED")
+          PY

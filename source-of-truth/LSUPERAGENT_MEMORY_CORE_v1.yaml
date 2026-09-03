@@ -1,0 +1,134 @@
+schema:
+  name: LSUPERAGENT_MEMORY_CORE
+  version: 1.1.1
+  status: DATABASE_FOUNDATION_STAGED
+  owner: THANABAT SOMSAK
+  canonical_authority: LSUPERAGENT
+
+source_of_truth:
+  durable_operational_memory: Supabase private schema lsuperagent
+  approval_and_audit: Supabase private schema lsuperagent
+  retrieval_index: derived from canonical records only
+  session_continuity: OpenAI Responses/Conversations, non-canonical
+  secrets: Supabase Vault references only
+
+release:
+  required_approval: RELEASE_APPROVED
+  deployment_state: NOT_DEPLOYED_FROM_THIS_PR
+  production_project: lsuperagent-runtime
+  project_ref: ilzjtbfhoxirsuilwmor
+  migration_id: 20260818200849_lsuperagent_memory_core
+  migration_source: supabase/migrations/20260818200849_lsuperagent_memory_core.sql
+  migration_source_sha256: 5c04fa958f4538c6cb0426b3afa06edd61bd592b3d62e6cf0b6d27006819f2c3
+  verified_in_pr:
+    - private_schema_declared
+    - RLS_declared_on_memory_tables
+    - anon_and_authenticated_revoked
+    - service_role_delete_not_granted
+    - lifecycle_guard_declared
+    - mutation_audit_trigger_declared
+    - audit_events_append_only_declared
+    - public_rls_auto_enable_execute_revoked
+  production_verification: PENDING_AFTER_APPROVED_APPLY
+  client_integration: blocked_until_trusted_writer_policy_gate_and_production_smoke_checks_pass
+
+hard_rules:
+  - No model output, compaction item, or session summary writes canonical memory directly.
+  - Every fact-like record has source references, evidence level, validity, and integrity hash.
+  - User preference and identity changes require explicit user approval.
+  - System state, release state, and operational lessons require independent validation.
+  - Audit events are append-only; corrections are new events, never silent edits.
+  - Client roles have no access to the private memory schema.
+  - Canonical and terminal payloads are immutable; corrections create a new candidate and lifecycle event.
+  - Physical deletion of memory records is prohibited.
+
+memory_lifecycle:
+  states:
+    - candidate
+    - verified
+    - canonical
+    - superseded
+    - revoked
+    - expired
+  write_gate:
+    - classify_and_redact
+    - attach_source_and_scope
+    - policy_and_validator_check
+    - canonical_transaction
+    - append_audit_event_in_same_transaction
+    - update_retrieval_index
+  database_enforcement:
+    insert_status: candidate_only
+    status_transition_requires_policy_decision_id: true
+    verified_and_canonical_payloads_immutable: true
+    terminal_records_immutable: true
+    physical_delete_allowed: false
+    updated_at_managed_by_trigger: true
+    accepted_insert_or_update_auto_audited: true
+
+renderer_contract:
+  renderer: wforge-image-mcp-wxx
+  authority: execution_only
+  direct_memory_write: prohibited
+  allowed_stages:
+    - generate_scene
+    - generate_text_layer
+    - composite_final
+  required_before_render:
+    - locked_IMAGE_Spec
+    - BRIEF_PICTURE
+    - explicit_user_Approved
+  input_minimization:
+    prohibited:
+      - secrets
+      - Vault_values
+      - durable_profile_data
+      - unredacted_personal_data
+    references: approved_assets_or_authorized_URLs_only
+  stage_controls:
+    generate_scene: current_locked_brief_and_approval_only
+    generate_text_layer: copy_must_exactly_match_copy_source_of_truth
+    composite_final: immutable_scene_and_text_layer_refs_from_same_work_and_brief
+  required_artifact_manifest:
+    - work_id
+    - brief_hash
+    - approval_ref
+    - renderer
+    - stage
+    - source_artifact_refs
+    - output_ref
+    - aspect_ratio
+    - content_hash
+    - copy_integrity
+    - qc_status
+    - policy_decision_id
+  audit_actions:
+    - render_requested
+    - scene_rendered
+    - text_layer_rendered
+    - composite_rendered
+    - render_qc_passed
+    - render_qc_failed
+    - artifact_registered
+  promotion_rule: only_LSUPERAGENT_validates_and_registers_artifacts
+
+release_guard:
+  database_migration: supabase/migrations/20260818200849_lsuperagent_memory_core.sql
+  migration_sha256: 5c04fa958f4538c6cb0426b3afa06edd61bd592b3d62e6cf0b6d27006819f2c3
+  requires:
+    - Draft PR review
+    - Memory Core CI PASS on exact migration hash
+    - Security advisor re-check after apply
+    - Smoke query against private schema
+    - Edge Function or trusted server writer before client integration
+    - RELEASE_APPROVED for production migration
+  security_remediation:
+    - Revoke direct EXECUTE from public, anon, and authenticated on public.rls_auto_enable().
+    - Deny physical DELETE on canonical memory records.
+    - Enforce lifecycle transitions and audit coupling in database triggers.
+  prohibited:
+    - Direct browser access to lsuperagent schema
+    - Public SECURITY DEFINER functions for memory writes
+    - Raw secret storage in memory records
+    - Direct renderer writes to Supabase or canonical memory
+    - Production-deployed status without post-apply evidence
